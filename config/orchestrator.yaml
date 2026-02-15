@@ -1,0 +1,21 @@
+model: "claude-sonnet-4-5-20250929"
+maxTotalBudgetUsd: 20.00
+maxAgents: 5
+
+escalation:
+  evaluatorModel: "claude-haiku-4-5-20251001"
+  confidenceThreshold: 0.8
+  telegramTimeoutSeconds: 300
+
+telegram:
+  # Set via env: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+  enabled: true
+  notifyOnStart: true
+  notifyOnComplete: true
+  notifyOnError: true
+  denialAlertThreshold: 5
+
+agent:
+  maxTurnsPerAgent: 50
+  maxBudgetPerAgent: 5.00
+  consecutiveDenialLimit: 5

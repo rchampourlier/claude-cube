@@ -1,0 +1,57 @@
+version: "1"
+defaults:
+  unmatched: "escalate"
+  max_budget_per_agent: 5.00
+  max_turns_per_agent: 50
+
+rules:
+  # DENY - checked first, immediate block
+  - name: "Block destructive commands"
+    action: deny
+    tool: Bash
+    match:
+      command:
+        - pattern: "rm\\s+(-[a-zA-Z]*f[a-zA-Z]*\\s+)?/"
+          type: regex
+    reason: "Destructive filesystem command blocked"
+
+  - name: "Block force push"
+    action: deny
+    tool: Bash
+    match:
+      command:
+        - pattern: "git\\s+push\\s+.*--force"
+          type: regex
+    reason: "Force push blocked"
+
+  - name: "Block sensitive file edits"
+    action: deny
+    tool: "Write|Edit"
+    match:
+      file_path:
+        - pattern: "\\.(env|pem)$|credentials|secrets?"
+          type: regex
+    reason: "Sensitive file modification blocked"
+
+  # ALLOW - auto-approve without prompting
+  - name: "Allow read-only tools"
+    action: allow
+    tool: "Read|Glob|Grep"
+
+  - name: "Allow edits within src/"
+    action: allow
+    tool: "Write|Edit"
+    match:
+      file_path:
+        - pattern: "^.*/src/.*"
+          type: regex
+
+  - name: "Allow safe dev commands"
+    action: allow
+    tool: Bash
+    match:
+      command:
+        - pattern: "^(npm|npx|yarn|pnpm)\\s+(test|lint|build|run|check|tsc)"
+          type: regex
+        - pattern: "^git\\s+(status|log|diff|branch|show|add|commit)"
+          type: regex
