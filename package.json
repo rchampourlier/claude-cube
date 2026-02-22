@@ -15,7 +15,7 @@
     "test": "node --test --import tsx 'src/**/*.test.ts'"
   },
   "dependencies": {
-    "@anthropic-ai/claude-code": "^1",
+    "@anthropic-ai/claude-code": "^2.1.50",
     "@anthropic-ai/sdk": "^0.39",
     "micromatch": "^4.0.8",
     "telegraf": "^4.16",
