@@ -26,6 +26,17 @@ export class TelegramBot {
   }
 
   private setupCommands(): void {
+    // Reject messages from unauthorized chats
+    this.bot.use((ctx, next) => {
+      const chatId = String(ctx.chat?.id);
+      if (chatId !== this.chatId) {
+        log.warn("Rejected message from unauthorized chat", { chatId });
+        ctx.reply("Unauthorized.");
+        return;
+      }
+      return next();
+    });
+
     this.bot.command("start", (ctx) => {
       const id = String(ctx.chat.id);
       log.info("Received /start", { chatId: id });
