@@ -36,6 +36,7 @@ export function createPreToolUseHandler(
 
     log.info("PreToolUse", { toolName, sessionId });
 
+    sessionTracker.ensureRegistered(sessionId, input.cwd);
     sessionTracker.updateToolUse(sessionId, toolName);
     sessionTracker.updateState(sessionId, "permission_pending");
 

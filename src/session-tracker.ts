@@ -43,6 +43,14 @@ export class SessionTracker {
     return Array.from(this.sessions.values());
   }
 
+  /** Auto-register a session if it's not already tracked (e.g. after server restart). */
+  ensureRegistered(sessionId: string, cwd: string): void {
+    if (!this.sessions.has(sessionId)) {
+      this.register(sessionId, cwd);
+      log.info("Auto-registered unknown session", { sessionId });
+    }
+  }
+
   updateState(sessionId: string, state: SessionState): void {
     const session = this.sessions.get(sessionId);
     if (session) {

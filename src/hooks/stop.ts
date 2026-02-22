@@ -38,6 +38,8 @@ export function createStopHandler(
 
     log.info("Stop hook fired", { sessionId });
 
+    sessionTracker.ensureRegistered(sessionId, input.cwd);
+
     if (!lastMessage) {
       return {};
     }
