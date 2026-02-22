@@ -34,7 +34,8 @@ export function createPreToolUseHandler(
   return async (input: PreToolUseInput): Promise<PreToolUseResponse> => {
     const { tool_name: toolName, tool_input: toolInput, session_id: sessionId } = input;
 
-    log.info("PreToolUse", { toolName, sessionId });
+    const label = sessionTracker.getLabel(sessionId);
+    log.info(`[${label}] PreToolUse`, { toolName });
 
     sessionTracker.ensureRegistered(sessionId, input.cwd);
     sessionTracker.updateToolUse(sessionId, toolName);
@@ -98,6 +99,7 @@ export function createPreToolUseHandler(
       toolInput,
       {
         agentId: sessionId,
+        label: sessionTracker.getLabel(sessionId),
         rulesContext,
         escalationReason: result.reason,
       },

@@ -1,4 +1,5 @@
 import type { TelegramBot } from "./bot.js";
+import type { SessionTracker } from "../session-tracker.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("telegram-notifications");
@@ -6,6 +7,7 @@ const log = createLogger("telegram-notifications");
 export class NotificationManager {
   constructor(
     private bot: TelegramBot,
+    private sessionTracker: SessionTracker,
     private config: {
       notifyOnStart: boolean;
       notifyOnComplete: boolean;
@@ -16,20 +18,23 @@ export class NotificationManager {
 
   async sessionStarted(sessionId: string, cwd: string): Promise<void> {
     if (!this.config.notifyOnStart) return;
+    const label = this.sessionTracker.getLabel(sessionId);
     await this.send(
-      `*Session started*\nID: \`${sessionId.slice(0, 12)}\`\nCWD: \`${escapeMarkdown(cwd)}\``,
+      `*Session started*\n\`${label}\`\nCWD: \`${escapeMarkdown(cwd)}\``,
     );
   }
 
   async sessionEnded(sessionId: string): Promise<void> {
     if (!this.config.notifyOnComplete) return;
-    await this.send(`*Session ended*\nID: \`${sessionId.slice(0, 12)}\``);
+    const label = this.sessionTracker.getLabel(sessionId);
+    await this.send(`*Session ended*\n\`${label}\``);
   }
 
   async denialAlert(sessionId: string, denialCount: number, lastTool: string): Promise<void> {
     if (denialCount < this.config.denialAlertThreshold) return;
+    const label = this.sessionTracker.getLabel(sessionId);
     await this.send(
-      `*Denial alert*\nSession \`${sessionId.slice(0, 12)}\` has been denied ${denialCount} times\\.\nLast tool: \`${lastTool}\`\nThe session may be stuck\\.`,
+      `*Denial alert*\n\`${label}\` has been denied ${denialCount} times\\.\nLast tool: \`${lastTool}\`\nThe session may be stuck\\.`,
     );
   }
 

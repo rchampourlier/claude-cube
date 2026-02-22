@@ -30,15 +30,16 @@ export function createStopHandler(
   return async (input: StopInput): Promise<StopResponse> => {
     const { session_id: sessionId, stop_hook_active: stopHookActive, last_assistant_message: lastMessage } = input;
 
+    sessionTracker.ensureRegistered(sessionId, input.cwd);
+    const label = sessionTracker.getLabel(sessionId);
+
     // Prevent infinite loops — if this stop was triggered by a previous block, let it stop
     if (stopHookActive) {
-      log.info("Stop hook active flag set, letting stop through", { sessionId });
+      log.info(`[${label}] Stop hook active flag set, letting stop through`);
       return {};
     }
 
-    log.info("Stop hook fired", { sessionId });
-
-    sessionTracker.ensureRegistered(sessionId, input.cwd);
+    log.info(`[${label}] Stop hook fired`);
 
     if (!lastMessage) {
       return {};
@@ -52,13 +53,13 @@ export function createStopHandler(
       const count = retryCount.get(sessionId) ?? 0;
       if (count < config.maxRetries) {
         retryCount.set(sessionId, count + 1);
-        log.info("Agent appears to have errored, forcing continue", { sessionId, retry: count + 1 });
+        log.info(`[${label}] Agent errored, forcing continue`, { retry: count + 1 });
         return {
           decision: "block",
           reason: "The previous approach hit an error. Try a different approach to accomplish the task.",
         };
       }
-      log.info("Max retries reached, letting stop through", { sessionId, maxRetries: config.maxRetries });
+      log.info(`[${label}] Max retries reached, letting stop through`);
       retryCount.delete(sessionId);
       return {};
     }
@@ -67,10 +68,10 @@ export function createStopHandler(
     const looksLikeQuestion = /\?$|\bshould I\b|\bwould you like\b|\bdo you want/i.test(lastMessage.trim());
 
     if (looksLikeQuestion && config.escalateToTelegram && approvalManager) {
-      log.info("Agent stopped with a question, forwarding to Telegram", { sessionId });
+      log.info(`[${label}] Agent stopped with a question, forwarding to Telegram`);
 
       // Send the actual question to Telegram and wait for a reply
-      const result = await approvalManager.requestStopDecision(sessionId, lastMessage);
+      const result = await approvalManager.requestStopDecision(sessionId, lastMessage, label);
 
       if (result.approved) {
         // If the human replied with text, use that as the answer

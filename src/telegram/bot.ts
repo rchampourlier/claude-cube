@@ -52,7 +52,7 @@ export class TelegramBot {
       const lines = sessions.map((s) => {
         const age = Math.round((Date.now() - new Date(s.startedAt).getTime()) / 60000);
         return [
-          `*${escapeMarkdown(s.sessionId.slice(0, 12))}*`,
+          `*${escapeMarkdown(s.label)}*`,
           `  State: ${s.state} | Denials: ${s.denialCount}`,
           `  CWD: \`${s.cwd}\``,
           `  Last tool: ${s.lastToolName ?? "—"} | Age: ${age}m`,

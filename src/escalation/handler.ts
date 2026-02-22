@@ -32,12 +32,14 @@ export class EscalationHandler {
     toolInput: Record<string, unknown>,
     context: {
       agentId: string;
+      label?: string;
       rulesContext: string;
       escalationReason: string;
     },
   ): Promise<EscalationDecision> {
     // Step 1: Try LLM evaluator
-    log.info("Running LLM evaluation", { toolName, agentId: context.agentId });
+    const label = context.label ?? context.agentId.slice(0, 12);
+    log.info(`[${label}] Running LLM evaluation`, { toolName });
     const llmResult = await this.evaluator.evaluate(
       toolName,
       toolInput,
@@ -46,7 +48,7 @@ export class EscalationHandler {
     );
 
     if (llmResult.confident) {
-      log.info("LLM confident decision", {
+      log.info(`[${label}] LLM confident decision`, {
         toolName,
         allowed: llmResult.allowed,
         reason: llmResult.reason,
@@ -68,12 +70,13 @@ export class EscalationHandler {
       };
     }
 
-    log.info("LLM uncertain, escalating to Telegram", { toolName, agentId: context.agentId });
+    log.info(`[${label}] LLM uncertain, escalating to Telegram`, { toolName });
     const telegramResult: ApprovalResult = await this.approvalManager.requestApproval(
       toolName,
       toolInput,
       {
         agentId: context.agentId,
+        label: context.label,
         reason: `LLM uncertain: ${llmResult.reason}`,
       },
     );

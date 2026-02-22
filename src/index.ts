@@ -123,7 +123,7 @@ async function main(): Promise<void> {
       chatId,
       config.escalation.telegramTimeoutSeconds * 1000,
     );
-    notifications = new NotificationManager(telegramBot, config.telegram);
+    notifications = new NotificationManager(telegramBot, sessionTracker, config.telegram);
     log.info("Telegram bot configured");
   } else {
     log.warn("Telegram not configured (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID)");

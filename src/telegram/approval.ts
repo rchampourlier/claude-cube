@@ -120,15 +120,16 @@ export class ApprovalManager {
   async requestApproval(
     toolName: string,
     toolInput: Record<string, unknown>,
-    context: { agentId: string; reason: string },
+    context: { agentId: string; label?: string; reason: string },
   ): Promise<ApprovalResult> {
     const id = `req_${++this.counter}_${Date.now()}`;
 
     const inputSummary = formatToolInput(toolName, toolInput);
+    const displayName = context.label ?? context.agentId.slice(0, 12);
     const message = [
       `🔔 *Permission Request*`,
       ``,
-      `*Session:* \`${context.agentId.slice(0, 12)}\``,
+      `*Session:* \`${displayName}\``,
       `*Tool:* \`${toolName}\``,
       `*Reason:* ${context.reason}`,
       ``,
@@ -191,14 +192,16 @@ export class ApprovalManager {
   async requestStopDecision(
     sessionId: string,
     lastMessage: string,
+    label?: string,
   ): Promise<ApprovalResult> {
     const id = `stop_${++this.counter}_${Date.now()}`;
 
     const truncated = lastMessage.length > 800 ? lastMessage.slice(-800) : lastMessage;
+    const displayName = label ?? sessionId.slice(0, 12);
     const message = [
       `🛑 *Agent stopped*`,
       ``,
-      `*Session:* \`${sessionId.slice(0, 12)}\``,
+      `*Session:* \`${displayName}\``,
       ``,
       `Last message:`,
       `\`\`\``,
