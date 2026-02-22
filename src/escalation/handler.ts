@@ -47,20 +47,19 @@ export class EscalationHandler {
       context.escalationReason,
     );
 
-    if (llmResult.confident) {
-      log.info(`[${label}] LLM confident decision`, {
-        toolName,
-        allowed: llmResult.allowed,
-        reason: llmResult.reason,
-      });
+    if (llmResult.confident && llmResult.allowed) {
+      log.info(`[${label}] LLM confident allow`, { toolName, reason: llmResult.reason });
       return {
-        allowed: llmResult.allowed,
+        allowed: true,
         reason: `LLM: ${llmResult.reason}`,
         decidedBy: "llm",
       };
     }
 
-    // Step 2: LLM uncertain → escalate to Telegram
+    // LLM denied or uncertain → always escalate to Telegram
+    if (llmResult.confident) {
+      log.info(`[${label}] LLM confident deny, escalating to Telegram anyway`, { toolName, reason: llmResult.reason });
+    }
     if (!this.approvalManager) {
       log.warn("No Telegram approval manager; denying by default", { toolName });
       return {
