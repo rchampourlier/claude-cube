@@ -35,11 +35,11 @@ export function createStopHandler(
 
     // Prevent infinite loops — if this stop was triggered by a previous block, let it stop
     if (stopHookActive) {
-      log.info(`[${label}] Stop hook active flag set, letting stop through`);
+      log.info("Stop hook active flag set, letting stop through", undefined, label);
       return {};
     }
 
-    log.info(`[${label}] Stop hook fired`);
+    log.info("Stop hook fired", undefined, label);
 
     if (!lastMessage) {
       return {};
@@ -53,13 +53,13 @@ export function createStopHandler(
       const count = retryCount.get(sessionId) ?? 0;
       if (count < config.maxRetries) {
         retryCount.set(sessionId, count + 1);
-        log.info(`[${label}] Agent errored, forcing continue`, { retry: count + 1 });
+        log.info("Agent errored, forcing continue", { retry: count + 1 }, label);
         return {
           decision: "block",
           reason: "The previous approach hit an error. Try a different approach to accomplish the task.",
         };
       }
-      log.info(`[${label}] Max retries reached, letting stop through`);
+      log.info("Max retries reached, letting stop through", undefined, label);
       retryCount.delete(sessionId);
       return {};
     }
@@ -68,7 +68,7 @@ export function createStopHandler(
     const looksLikeQuestion = /\?$|\bshould I\b|\bwould you like\b|\bdo you want/i.test(lastMessage.trim());
 
     if (looksLikeQuestion && config.escalateToTelegram && approvalManager) {
-      log.info(`[${label}] Agent stopped with a question, forwarding to Telegram`);
+      log.info("Agent stopped with a question, forwarding to Telegram", undefined, label);
 
       // Send the actual question to Telegram and wait for a reply
       const result = await approvalManager.requestStopDecision(sessionId, lastMessage, label);

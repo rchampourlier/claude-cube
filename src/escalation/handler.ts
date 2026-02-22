@@ -39,7 +39,7 @@ export class EscalationHandler {
   ): Promise<EscalationDecision> {
     // Step 1: Try LLM evaluator
     const label = context.label ?? context.agentId.slice(0, 12);
-    log.info(`[${label}] Running LLM evaluation`, { toolName });
+    log.info("Running LLM evaluation", { toolName }, label);
     const llmResult = await this.evaluator.evaluate(
       toolName,
       toolInput,
@@ -48,7 +48,7 @@ export class EscalationHandler {
     );
 
     if (llmResult.confident && llmResult.allowed) {
-      log.info(`[${label}] LLM confident allow`, { toolName, reason: llmResult.reason });
+      log.info("LLM confident allow", { toolName, reason: llmResult.reason }, label);
       return {
         allowed: true,
         reason: `LLM: ${llmResult.reason}`,
@@ -58,7 +58,7 @@ export class EscalationHandler {
 
     // LLM denied or uncertain → always escalate to Telegram
     if (llmResult.confident) {
-      log.info(`[${label}] LLM confident deny, escalating to Telegram anyway`, { toolName, reason: llmResult.reason });
+      log.info("LLM confident deny, escalating to Telegram anyway", { toolName, reason: llmResult.reason }, label);
     }
     if (!this.approvalManager) {
       log.warn("No Telegram approval manager; denying by default", { toolName });
@@ -69,7 +69,7 @@ export class EscalationHandler {
       };
     }
 
-    log.info(`[${label}] LLM uncertain, escalating to Telegram`, { toolName });
+    log.info("LLM uncertain, escalating to Telegram", { toolName }, label);
     const telegramResult: ApprovalResult = await this.approvalManager.requestApproval(
       toolName,
       toolInput,

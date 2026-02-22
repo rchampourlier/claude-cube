@@ -35,7 +35,7 @@ export function createPreToolUseHandler(
     const { tool_name: toolName, tool_input: toolInput, session_id: sessionId } = input;
 
     const label = sessionTracker.getLabel(sessionId);
-    log.info(`[${label}] PreToolUse`, { toolName });
+    log.info("PreToolUse", { toolName }, label);
 
     sessionTracker.ensureRegistered(sessionId, input.cwd);
     sessionTracker.updateToolUse(sessionId, toolName);
