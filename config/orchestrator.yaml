@@ -1,6 +1,5 @@
-model: "claude-sonnet-4-5-20250929"
-maxTotalBudgetUsd: 20.00
-maxAgents: 5
+server:
+  port: 7080
 
 escalation:
   evaluatorModel: "claude-haiku-4-5-20251001"
@@ -15,7 +14,9 @@ telegram:
   notifyOnError: true
   denialAlertThreshold: 5
 
-agent:
-  maxTurnsPerAgent: 50
-  maxBudgetPerAgent: 5.00
-  consecutiveDenialLimit: 5
+stop:
+  # When agent stops with an error, auto-retry with guidance
+  retryOnError: true
+  maxRetries: 2
+  # When uncertain, ask via Telegram
+  escalateToTelegram: true

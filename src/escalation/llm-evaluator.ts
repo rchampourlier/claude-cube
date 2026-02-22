@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { PolicyStore } from "../policies/store.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("llm-evaluator");
@@ -9,12 +10,13 @@ export interface LlmEvaluationResult {
   reason: string;
 }
 
-const SYSTEM_PROMPT = `You are a security evaluator for an automated coding agent. You evaluate whether a tool call should be allowed or denied based on safety rules.
+const SYSTEM_PROMPT = `You are a security evaluator for an automated coding agent. You evaluate whether a tool call should be allowed or denied based on safety rules and human-defined policies.
 
 You will receive:
 - The tool name and its input
 - The safety rules context
 - The reason this was escalated
+- Any human-defined policies that apply
 
 Respond with a JSON object:
 {
@@ -27,6 +29,7 @@ Guidelines:
 - Read-only operations are generally safe
 - File edits within the project's src/ directory are generally safe
 - Commands that could modify system state, delete files, or affect git history should be treated cautiously
+- Human-defined policies take precedence over your own judgment — if a policy clearly covers this case, follow it and set confident=true
 - When in doubt, set confident=false to escalate to a human`;
 
 export class LlmEvaluator {
@@ -35,6 +38,7 @@ export class LlmEvaluator {
   constructor(
     private model: string,
     private confidenceThreshold: number,
+    private policyStore: PolicyStore | null = null,
   ) {
     this.client = new Anthropic();
   }
@@ -45,6 +49,8 @@ export class LlmEvaluator {
     rulesContext: string,
     escalationReason: string,
   ): Promise<LlmEvaluationResult> {
+    const policiesContext = this.policyStore?.formatForLlm(toolName) ?? "";
+
     const userMessage = [
       `Tool: ${toolName}`,
       `Input: ${JSON.stringify(toolInput, null, 2)}`,
@@ -53,10 +59,11 @@ export class LlmEvaluator {
       rulesContext,
       ``,
       `Escalation reason: ${escalationReason}`,
+      ...(policiesContext ? [``, policiesContext] : []),
     ].join("\n");
 
     try {
-      log.info("Evaluating with LLM", { toolName, model: this.model });
+      log.info("Evaluating with LLM", { toolName, model: this.model, policyCount: this.policyStore?.getAll().length ?? 0 });
 
       const response = await this.client.messages.create({
         model: this.model,

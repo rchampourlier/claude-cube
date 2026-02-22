@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export const ServerConfigSchema = z.object({
+  port: z.number().int().positive().default(7080),
+});
+
 export const EscalationConfigSchema = z.object({
   evaluatorModel: z.string().default("claude-haiku-4-5-20251001"),
   confidenceThreshold: z.number().min(0).max(1).default(0.8),
@@ -14,22 +18,21 @@ export const TelegramConfigSchema = z.object({
   denialAlertThreshold: z.number().int().positive().default(5),
 });
 
-export const AgentConfigSchema = z.object({
-  maxTurnsPerAgent: z.number().int().positive().default(50),
-  maxBudgetPerAgent: z.number().positive().default(5.0),
-  consecutiveDenialLimit: z.number().int().positive().default(5),
+export const StopConfigSchema = z.object({
+  retryOnError: z.boolean().default(true),
+  maxRetries: z.number().int().min(0).default(2),
+  escalateToTelegram: z.boolean().default(true),
 });
 
 export const OrchestratorConfigSchema = z.object({
-  model: z.string().default("claude-sonnet-4-5-20250929"),
-  maxTotalBudgetUsd: z.number().positive().default(20.0),
-  maxAgents: z.number().int().positive().default(5),
+  server: ServerConfigSchema,
   escalation: EscalationConfigSchema,
   telegram: TelegramConfigSchema,
-  agent: AgentConfigSchema,
+  stop: StopConfigSchema,
 });
 
+export type ServerConfig = z.infer<typeof ServerConfigSchema>;
 export type EscalationConfig = z.infer<typeof EscalationConfigSchema>;
 export type TelegramConfig = z.infer<typeof TelegramConfigSchema>;
-export type AgentConfig = z.infer<typeof AgentConfigSchema>;
+export type StopConfig = z.infer<typeof StopConfigSchema>;
 export type OrchestratorConfig = z.infer<typeof OrchestratorConfigSchema>;

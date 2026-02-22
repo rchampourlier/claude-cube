@@ -16,9 +16,8 @@ Always run `npm run lint` after making changes. The project must compile with ze
 ## Tech stack
 
 - **TypeScript** (strict, ESM, Node16 module resolution)
-- **Node >= 22** — uses `node:util` `parseArgs`, top-level await patterns
-- **`@anthropic-ai/claude-code`** — the Claude Code SDK. Provides `query()` to spawn agents, hook types (`HookInput`, `HookJSONOutput`), and message types (`SDKMessage`, `SDKResultMessage`). Types are in `node_modules/@anthropic-ai/claude-code/sdk.d.ts`.
-- **`@anthropic-ai/sdk`** — direct Anthropic API client, used only by the LLM evaluator (`src/escalation/llm-evaluator.ts`) to call Haiku.
+- **Node >= 22** — uses `node:util` `parseArgs`, `fetch`, top-level await patterns
+- **`@anthropic-ai/sdk`** — direct Anthropic API client, used by the LLM evaluator (`src/escalation/llm-evaluator.ts`) to call Haiku.
 - **Telegraf** — Telegram bot framework. Inline keyboards for approval flow.
 - **Zod** — runtime validation of YAML configs and rules.
 - **yaml** — YAML parsing for `config/rules.yaml` and `config/orchestrator.yaml`.
@@ -26,49 +25,71 @@ Always run `npm run lint` after making changes. The project must compile with ze
 
 ## Architecture
 
+ClaudeCube is a **hooks-based orchestrator**. It does NOT spawn agents — instead it monitors existing `claude` CLI sessions via Claude Code's hooks system.
+
+### How it works
+
+1. Claude Code hooks (configured in `~/.claude/settings.json`) call a shell script (`hooks/claudecube-hook.sh`) on events
+2. The shell script POSTs to ClaudeCube's local HTTP server (`http://localhost:7080/hooks/<event>`)
+3. ClaudeCube evaluates rules, optionally escalates to LLM/Telegram, and returns decisions
+4. The shell script outputs the response back to Claude Code
+
 ### Permission flow (the core loop)
 
-Every tool call from a sub-agent triggers a `PreToolUse` hook:
+```
+Claude Code fires PreToolUse hook
+  → Shell script → HTTP POST /hooks/PreToolUse
+    → RuleEngine.evaluate(toolName, toolInput)
+      → DENY rules checked first → block immediately
+      → ALLOW rules checked next → approve immediately
+      → No match → EscalationHandler
+        → LlmEvaluator (Haiku) → if confident, decide
+                                 → if uncertain, Telegram approval
+```
+
+### Stop handler flow
 
 ```
-PreToolUse hook fires
-  → RuleEngine.evaluate(toolName, toolInput)
-    → DENY rules checked first → block immediately
-    → ALLOW rules checked next → approve immediately
-    → No match → EscalationHandler
-      → LlmEvaluator (Haiku) → if confident, decide
-                               → if uncertain, Telegram approval
+Claude Code fires Stop hook
+  → Shell script → HTTP POST /hooks/Stop
+    → Check stop_hook_active (prevent loops)
+    → Detect error pattern in last_assistant_message → force retry
+    → Detect question pattern → escalate to Telegram
+    → Otherwise → let stop
 ```
-
-This flow lives across three files:
-1. `src/hooks/permission-hook.ts` — the hook callback wired into the SDK
-2. `src/rule-engine/engine.ts` — deterministic rule evaluation
-3. `src/escalation/handler.ts` — LLM + Telegram escalation coordinator
 
 ### Module dependency graph
 
 ```
-index.ts → Orchestrator
-  → AgentManager  → query() from SDK
-  → RuleEngine    → rules.yaml
-  → EscalationHandler → LlmEvaluator (Anthropic API)
-                      → ApprovalManager (Telegram)
-  → TelegramBot   → Telegraf
-  → AuditLog       → JSONL files
-  → NotificationManager → TelegramBot
+index.ts (CLI + server startup)
+  → server.ts (HTTP routes)
+    → hooks/pre-tool-use.ts → RuleEngine → rules.yaml
+                             → EscalationHandler → LlmEvaluator (Anthropic API)
+                                                 → ApprovalManager (Telegram)
+    → hooks/stop.ts → StopConfig + ApprovalManager
+    → hooks/lifecycle.ts → SessionTracker + NotificationManager
+  → session-tracker.ts (active session state)
+  → telegram/ → Telegraf bot + approval + notifications
+  → tmux.ts → list panes, send keys
+  → installer.ts → patch ~/.claude/settings.json
 ```
 
 ### Key modules
 
 | Module | Entry | Responsibility |
 |--------|-------|----------------|
+| `src/server.ts` | — | HTTP server with routes per hook event + `/status` endpoint |
+| `src/hooks/pre-tool-use.ts` | — | PreToolUse handler: rule engine → escalation → audit |
+| `src/hooks/stop.ts` | — | Stop handler: error retry, question escalation |
+| `src/hooks/lifecycle.ts` | — | SessionStart/End/Notification handlers for session tracking |
+| `src/session-tracker.ts` | — | Tracks active sessions and their state |
+| `src/tmux.ts` | — | List Claude panes in tmux, send keys for text injection |
+| `src/installer.ts` | — | Patches `~/.claude/settings.json` to add/remove hooks |
 | `src/rule-engine/` | `engine.ts` | Stateless deny-first rule evaluator. Partitions rules at construction. |
-| `src/hooks/` | `permission-hook.ts` | Bridges SDK hooks → rule engine → escalation. Must use SDK's `HookInput`/`HookJSONOutput` types. |
 | `src/escalation/` | `handler.ts` | Two-phase: LLM evaluator first, Telegram fallback if uncertain. |
-| `src/telegram/` | `bot.ts`, `approval.ts` | Bot lifecycle, inline keyboard approval with promise-per-request pattern, timeout handling. |
-| `src/agents/` | `manager.ts` | Wraps SDK `query()`. Owns agent lifecycle: spawn, drive (async iterate messages), abort, resume. |
-| `src/orchestrator.ts` | — | Top-level coordinator. Modes: single, parallel (`Promise.all`), pipeline (sequential with context chaining). |
+| `src/telegram/` | `bot.ts`, `approval.ts` | Bot lifecycle, inline keyboard approval, session status, tmux integration. |
 | `src/config/` | `types.ts`, `loader.ts` | Zod schemas for `orchestrator.yaml`. |
+| `hooks/claudecube-hook.sh` | — | Shell script called by Claude Code hooks; curls ClaudeCube server. |
 
 ## Conventions
 
@@ -80,22 +101,6 @@ import { RuleEngine } from "./engine.js";       // correct
 import { RuleEngine } from "./engine";           // wrong — will fail at runtime
 ```
 
-### SDK hook types
-
-Hook callbacks must accept the full `HookInput` union from `@anthropic-ai/claude-code` and narrow via `input.hook_event_name`:
-
-```typescript
-import type { HookInput, HookJSONOutput } from "@anthropic-ai/claude-code";
-
-async (input: HookInput): Promise<HookJSONOutput> => {
-  if (input.hook_event_name !== "PreToolUse") return {};
-  // input is now narrowed to PreToolUseHookInput
-  input.tool_name;  // safe
-};
-```
-
-Do NOT define custom hook input types — use the SDK's. The union includes events like `Notification` and `SessionStart` that lack `tool_name`/`tool_input`.
-
 ### Rule engine
 
 - Rules in `config/rules.yaml` are validated with Zod at load time, including regex compilation.
@@ -105,25 +110,27 @@ Do NOT define custom hook input types — use the SDK's. The union includes even
 
 ### Telegram approval
 
-`ApprovalManager` uses a `Map<string, PendingApproval>` keyed by unique request IDs. Each `requestApproval()` call returns a `Promise` that resolves when the user taps a button or the timeout expires. Keep this pattern — it decouples the approval lifecycle from the hook callback.
+`ApprovalManager` uses a `Map<string, PendingApproval>` keyed by unique request IDs. Each `requestApproval()` call returns a `Promise` that resolves when the user taps a button or the timeout expires.
 
 ### Error handling
 
-- The orchestrator catches agent exceptions and records them in `AgentState`.
-- Telegram send failures are caught and logged, never thrown — the bot being down should not crash agents.
+- Telegram send failures are caught and logged, never thrown — the bot being down should not crash the server.
 - LLM evaluator failures return `{ allowed: false, confident: false }` to trigger Telegram fallback.
+- The hook shell script fails open — if ClaudeCube is not running, hooks pass through silently.
 
 ## Config files
 
 - `config/rules.yaml` — safety rules. Schema: `src/rule-engine/types.ts` (`RulesConfigSchema`).
-- `config/orchestrator.yaml` — model, budget, escalation, Telegram settings. Schema: `src/config/types.ts` (`OrchestratorConfigSchema`).
+- `config/orchestrator.yaml` — server port, escalation, Telegram, stop handler settings. Schema: `src/config/types.ts` (`OrchestratorConfigSchema`).
 
 When adding new config fields, add them to the Zod schema first with a `.default()` value to keep backward compatibility.
 
-## What's missing (future work)
+## CLI usage
 
-- **Tests** — no test files exist yet. Use Node's built-in test runner (`node --test`). Place test files as `*.test.ts` next to source files.
-- **Denial loop detection** — `AgentState.consecutiveDenials` is tracked but not yet acted on. Should inject a "try a different approach" prompt after N consecutive denials and send a Telegram alert.
-- **Free-text forwarding** — Telegram free-text messages are received but not yet injected into the agent conversation. Needs the SDK's streaming input mode (`AsyncIterable<SDKUserMessage>` prompt).
-- **Structured output** — the SDK supports `outputFormat` for JSON schema output. Could be used for pipeline mode to pass structured data between agents.
-- **Graceful resume on laptop reopen** — pending approvals timeout and deny, but there's no mechanism to re-queue them.
+```
+claudecube                 # Start server (port 7080) + Telegram bot
+claudecube --install       # Patch ~/.claude/settings.json with hooks
+claudecube --uninstall     # Remove ClaudeCube hooks from settings
+claudecube --status        # Query GET /status and print
+claudecube --port 9090     # Custom port
+```

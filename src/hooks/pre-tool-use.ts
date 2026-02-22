@@ -1,38 +1,50 @@
-import type { HookInput, HookJSONOutput } from "@anthropic-ai/claude-code";
 import type { RuleEngine } from "../rule-engine/engine.js";
 import type { EscalationHandler } from "../escalation/handler.js";
 import type { AuditLog } from "./audit-hook.js";
+import type { SessionTracker } from "../session-tracker.js";
 import { createLogger } from "../util/logger.js";
 
-const log = createLogger("permission-hook");
+const log = createLogger("pre-tool-use");
 
-export function createPermissionHook(
+export interface PreToolUseInput {
+  hook_event_name: "PreToolUse";
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+  session_id: string;
+  cwd: string;
+  transcript_path: string;
+}
+
+export interface PreToolUseResponse {
+  decision?: "block" | "approve";
+  reason?: string;
+  hookSpecificOutput?: {
+    hookEventName: "PreToolUse";
+    permissionDecision: "allow" | "deny";
+    permissionDecisionReason?: string;
+  };
+}
+
+export function createPreToolUseHandler(
   ruleEngine: RuleEngine,
   escalationHandler: EscalationHandler,
   auditLog: AuditLog,
-  agentId: string,
+  sessionTracker: SessionTracker,
 ) {
-  return async (
-    input: HookInput,
-    _toolUseId: string | undefined,
-    _options: { signal: AbortSignal },
-  ): Promise<HookJSONOutput> => {
-    // Only handle PreToolUse events
-    if (input.hook_event_name !== "PreToolUse") {
-      return {};
-    }
+  return async (input: PreToolUseInput): Promise<PreToolUseResponse> => {
+    const { tool_name: toolName, tool_input: toolInput, session_id: sessionId } = input;
 
-    const toolName = input.tool_name;
-    const toolInput = (input.tool_input ?? {}) as Record<string, unknown>;
+    log.info("PreToolUse", { toolName, sessionId });
 
-    log.info("PreToolUse hook fired", { toolName, agentId });
+    sessionTracker.updateToolUse(sessionId, toolName);
+    sessionTracker.updateState(sessionId, "permission_pending");
 
     // Step 1: Rule engine evaluation
     const result = ruleEngine.evaluate(toolName, toolInput);
 
     if (result.action === "allow") {
       auditLog.log({
-        agentId,
+        sessionId,
         toolName,
         toolInput,
         decision: "allow",
@@ -40,6 +52,7 @@ export function createPermissionHook(
         decidedBy: "rule",
         ruleName: result.rule?.name,
       });
+      sessionTracker.updateState(sessionId, "active");
       return {
         hookSpecificOutput: {
           hookEventName: "PreToolUse",
@@ -51,7 +64,7 @@ export function createPermissionHook(
 
     if (result.action === "deny") {
       auditLog.log({
-        agentId,
+        sessionId,
         toolName,
         toolInput,
         decision: "deny",
@@ -59,6 +72,8 @@ export function createPermissionHook(
         decidedBy: "rule",
         ruleName: result.rule?.name,
       });
+      sessionTracker.recordDenial(sessionId);
+      sessionTracker.updateState(sessionId, "active");
       return {
         decision: "block",
         reason: result.reason,
@@ -70,7 +85,9 @@ export function createPermissionHook(
       };
     }
 
-    // Step 2: Escalation (LLM → Telegram)
+    // Step 2: Escalation (LLM -> Telegram)
+    sessionTracker.updateState(sessionId, "permission_pending");
+
     const rulesContext = result.rule
       ? `Matched rule: ${result.rule.name} (${result.rule.action})`
       : "No rule matched";
@@ -79,7 +96,7 @@ export function createPermissionHook(
       toolName,
       toolInput,
       {
-        agentId,
+        agentId: sessionId,
         rulesContext,
         escalationReason: result.reason,
       },
@@ -87,7 +104,7 @@ export function createPermissionHook(
 
     const decision = escalationResult.allowed ? "allow" : "deny";
     auditLog.log({
-      agentId,
+      sessionId,
       toolName,
       toolInput,
       decision,
@@ -95,6 +112,11 @@ export function createPermissionHook(
       decidedBy: escalationResult.decidedBy,
       ruleName: result.rule?.name,
     });
+
+    if (!escalationResult.allowed) {
+      sessionTracker.recordDenial(sessionId);
+    }
+    sessionTracker.updateState(sessionId, "active");
 
     return {
       decision: escalationResult.allowed ? "approve" : "block",

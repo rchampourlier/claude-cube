@@ -1,5 +1,6 @@
 import { LlmEvaluator } from "./llm-evaluator.js";
 import type { ApprovalManager, ApprovalResult } from "../telegram/approval.js";
+import type { PolicyStore } from "../policies/store.js";
 import type { EscalationConfig } from "../config/types.js";
 import { createLogger } from "../util/logger.js";
 
@@ -17,10 +18,12 @@ export class EscalationHandler {
   constructor(
     private config: EscalationConfig,
     private approvalManager: ApprovalManager | null,
+    private policyStore: PolicyStore | null = null,
   ) {
     this.evaluator = new LlmEvaluator(
       config.evaluatorModel,
       config.confidenceThreshold,
+      policyStore,
     );
   }
 
@@ -74,6 +77,16 @@ export class EscalationHandler {
         reason: `LLM uncertain: ${llmResult.reason}`,
       },
     );
+
+    // If the human replied with policy text, save it
+    if (telegramResult.policyText && this.policyStore) {
+      const policy = this.policyStore.add(telegramResult.policyText, toolName);
+      log.info("Policy created from Telegram reply", {
+        policyId: policy.id,
+        tool: toolName,
+        description: telegramResult.policyText.slice(0, 80),
+      });
+    }
 
     return {
       allowed: telegramResult.approved,

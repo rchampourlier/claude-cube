@@ -14,46 +14,22 @@ export class NotificationManager {
     },
   ) {}
 
-  async agentStarted(agentId: string, task: string): Promise<void> {
+  async sessionStarted(sessionId: string, cwd: string): Promise<void> {
     if (!this.config.notifyOnStart) return;
-    await this.send(`🚀 *Agent started*\nID: \`${agentId}\`\nTask: ${escapeMarkdown(task)}`);
+    await this.send(
+      `*Session started*\nID: \`${sessionId.slice(0, 12)}\`\nCWD: \`${escapeMarkdown(cwd)}\``,
+    );
   }
 
-  async agentCompleted(agentId: string, result: string, costUsd: number, turns: number): Promise<void> {
+  async sessionEnded(sessionId: string): Promise<void> {
     if (!this.config.notifyOnComplete) return;
-    const summary = result.length > 300 ? result.slice(0, 297) + "..." : result;
-    await this.send(
-      [
-        `✅ *Agent completed*`,
-        `ID: \`${agentId}\``,
-        `Turns: ${turns} | Cost: $${costUsd.toFixed(2)}`,
-        ``,
-        `Result: ${escapeMarkdown(summary)}`,
-      ].join("\n"),
-    );
+    await this.send(`*Session ended*\nID: \`${sessionId.slice(0, 12)}\``);
   }
 
-  async agentErrored(agentId: string, error: string, costUsd: number): Promise<void> {
-    if (!this.config.notifyOnError) return;
-    await this.send(
-      `❗ *Agent errored*\nID: \`${agentId}\`\nCost: $${costUsd.toFixed(2)}\nError: ${escapeMarkdown(error)}`,
-    );
-  }
-
-  async agentAborted(agentId: string): Promise<void> {
-    await this.send(`🛑 *Agent aborted*\nID: \`${agentId}\``);
-  }
-
-  async denialAlert(agentId: string, denialCount: number, lastTool: string): Promise<void> {
+  async denialAlert(sessionId: string, denialCount: number, lastTool: string): Promise<void> {
     if (denialCount < this.config.denialAlertThreshold) return;
     await this.send(
-      `⚠️ *Denial alert*\nAgent \`${agentId}\` has been denied ${denialCount} times.\nLast tool: \`${lastTool}\`\nThe agent may be stuck.`,
-    );
-  }
-
-  async budgetAlert(totalCost: number, maxBudget: number): Promise<void> {
-    await this.send(
-      `💰 *Budget alert*\nTotal cost: $${totalCost.toFixed(2)} / $${maxBudget.toFixed(2)}\nApproaching budget limit.`,
+      `*Denial alert*\nSession \`${sessionId.slice(0, 12)}\` has been denied ${denialCount} times\\.\nLast tool: \`${lastTool}\`\nThe session may be stuck\\.`,
     );
   }
 

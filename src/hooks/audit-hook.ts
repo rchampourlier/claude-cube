@@ -1,20 +1,18 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { HookInput, HookJSONOutput } from "@anthropic-ai/claude-code";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("audit");
 
 export interface AuditEntry {
   timestamp: string;
-  agentId: string;
+  sessionId: string;
   toolName: string;
   toolInput: Record<string, unknown>;
   decision: "allow" | "deny";
   reason: string;
   decidedBy: "rule" | "llm" | "telegram" | "timeout";
   ruleName?: string;
-  toolResponse?: unknown;
 }
 
 export class AuditLog {
@@ -36,18 +34,5 @@ export class AuditLog {
     } catch (e) {
       log.error("Failed to write audit entry", { error: String(e) });
     }
-  }
-
-  createPostToolUseHook(agentId: string) {
-    return async (
-      input: HookInput,
-      _toolUseId: string | undefined,
-      _options: { signal: AbortSignal },
-    ): Promise<HookJSONOutput> => {
-      if (input.hook_event_name === "PostToolUse") {
-        log.debug("PostToolUse", { toolName: input.tool_name, agentId });
-      }
-      return { continue: true };
-    };
   }
 }

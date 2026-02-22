@@ -1,21 +1,12 @@
-import { Telegraf, type Context } from "telegraf";
+import { Telegraf } from "telegraf";
+import type { SessionTracker } from "../session-tracker.js";
+import { listClaudePanes, sendKeys } from "../tmux.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("telegram-bot");
 
-export interface AgentStatusInfo {
-  id: string;
-  task: string;
-  status: "running" | "completed" | "errored" | "aborted";
-  turns: number;
-  costUsd: number;
-  denials: number;
-}
-
 export interface TelegramBotDeps {
-  getAgents: () => AgentStatusInfo[];
-  abortAgent: (id: string) => void;
-  getTotalCost: () => number;
+  sessionTracker: SessionTracker;
   onFreeText?: (chatId: number, text: string) => void;
 }
 
@@ -42,50 +33,71 @@ export class TelegramBot {
     });
 
     this.bot.command("status", (ctx) => {
-      const agents = this.deps.getAgents();
-      if (agents.length === 0) {
-        ctx.reply("No active agents.");
+      const sessions = this.deps.sessionTracker.getAll();
+      if (sessions.length === 0) {
+        ctx.reply("No active sessions.");
         return;
       }
-      const lines = agents.map(
-        (a) =>
-          `*${a.id}* — ${escapeMarkdown(a.task)}\n  Status: ${a.status} | Turns: ${a.turns} | Cost: $${a.costUsd.toFixed(2)} | Denials: ${a.denials}`,
-      );
+      const lines = sessions.map((s) => {
+        const age = Math.round((Date.now() - new Date(s.startedAt).getTime()) / 60000);
+        return [
+          `*${escapeMarkdown(s.sessionId.slice(0, 12))}*`,
+          `  State: ${s.state} | Denials: ${s.denialCount}`,
+          `  CWD: \`${s.cwd}\``,
+          `  Last tool: ${s.lastToolName ?? "—"} | Age: ${age}m`,
+        ].join("\n");
+      });
       ctx.reply(lines.join("\n\n"), { parse_mode: "Markdown" });
     });
 
-    this.bot.command("abort", (ctx) => {
-      const args = ctx.message.text.split(/\s+/).slice(1);
-      const agentId = args[0];
-      if (!agentId) {
-        ctx.reply("Usage: /abort <agent-id>");
+    this.bot.command("panes", (ctx) => {
+      const panes = listClaudePanes();
+      if (panes.length === 0) {
+        ctx.reply("No Claude panes found in tmux.");
         return;
       }
-      try {
-        this.deps.abortAgent(agentId);
-        ctx.reply(`Abort signal sent to agent ${agentId}.`);
-      } catch (e) {
-        ctx.reply(`Failed to abort: ${e}`);
-      }
-    });
-
-    this.bot.command("budget", (ctx) => {
-      const total = this.deps.getTotalCost();
-      const agents = this.deps.getAgents();
-      const lines = [
-        `*Total cost:* $${total.toFixed(2)}`,
-        ...agents.map((a) => `  ${a.id}: $${a.costUsd.toFixed(2)} (${a.status})`),
-      ];
+      const lines = panes.map(
+        (p) => `\`${p.paneId}\` — ${p.sessionName}:${p.windowIndex}.${p.paneIndex} (${p.command})`,
+      );
       ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
     });
 
-    // Free-text messages forwarded as context
+    this.bot.command("send", (ctx) => {
+      const args = ctx.message.text.split(/\s+/).slice(1);
+      const paneTarget = args[0];
+      const text = args.slice(1).join(" ");
+      if (!paneTarget || !text) {
+        ctx.reply("Usage: /send <pane-id> <text>");
+        return;
+      }
+      try {
+        sendKeys(paneTarget, text);
+        ctx.reply(`Sent to ${paneTarget}.`);
+      } catch (e) {
+        ctx.reply(`Failed: ${e}`);
+      }
+    });
+
+    // Free-text messages — inject into first Claude pane
     this.bot.on("text", (ctx) => {
       const text = ctx.message.text;
-      if (text.startsWith("/")) return; // ignore unknown commands
+      if (text.startsWith("/")) return;
       log.info("Received free text", { text: text.slice(0, 100) });
+
+      const panes = listClaudePanes();
+      if (panes.length === 0) {
+        ctx.reply("No Claude panes found to forward message to.");
+        return;
+      }
+
+      try {
+        sendKeys(panes[0].paneId, text);
+        ctx.reply(`Forwarded to pane ${panes[0].paneId}.`);
+      } catch (e) {
+        ctx.reply(`Failed to forward: ${e}`);
+      }
+
       this.deps.onFreeText?.(ctx.chat.id, text);
-      ctx.reply("Message forwarded to active agent.");
     });
   }
 
@@ -95,7 +107,6 @@ export class TelegramBot {
     this.bot.launch();
     this.started = true;
 
-    // Graceful shutdown
     const stop = () => {
       log.info("Stopping Telegram bot");
       this.bot.stop();

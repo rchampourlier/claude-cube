@@ -10,6 +10,6 @@ export function loadOrchestratorConfig(filePath: string): OrchestratorConfig {
   const raw = readFileSync(filePath, "utf-8");
   const parsed = parseYaml(raw);
   const config = OrchestratorConfigSchema.parse(parsed);
-  log.info("Loaded orchestrator config", { model: config.model, maxBudget: config.maxTotalBudgetUsd });
+  log.info("Loaded orchestrator config", { port: config.server.port });
   return config;
 }
