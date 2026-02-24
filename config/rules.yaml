@@ -46,6 +46,14 @@ rules:
         - pattern: "^.*/src/.*"
           type: regex
 
+  - name: "Allow edits within ~/.config"
+    action: allow
+    tool: "Write|Edit"
+    match:
+      file_path:
+        - pattern: "^/Users/romain\\.c8t/\\.config/.*"
+          type: regex
+
   - name: "Allow safe dev commands"
     action: allow
     tool: Bash
