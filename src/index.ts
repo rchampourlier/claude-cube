@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { resolve, join } from "node:path";
+import { watch } from "node:fs";
 import { parseArgs } from "node:util";
 import { setLogLevel, createLogger } from "./util/logger.js";
 import { loadOrchestratorConfig } from "./config/loader.js";
@@ -17,7 +18,7 @@ import {
 } from "./hooks/lifecycle.js";
 import { SessionTracker } from "./session-tracker.js";
 import { createHttpServer } from "./server.js";
-import { TelegramBot, ApprovalManager, NotificationManager } from "./telegram/index.js";
+import { TelegramBot, ApprovalManager, NotificationManager, ReplyEvaluator } from "./telegram/index.js";
 import { PolicyStore } from "./policies/index.js";
 import { install, uninstall } from "./installer.js";
 
@@ -102,7 +103,7 @@ async function main(): Promise<void> {
   const rulesConfig = loadRules(rulesPath);
   const port = values.port ? parseInt(values.port, 10) : config.server.port;
 
-  const ruleEngine = new RuleEngine(rulesConfig);
+  let ruleEngine = new RuleEngine(rulesConfig);
   const auditLog = new AuditLog(join(process.cwd(), ".claudecube", "audit"));
   const policyStore = new PolicyStore(resolve("config/policies.yaml"));
   const sessionTracker = new SessionTracker();
@@ -123,6 +124,8 @@ async function main(): Promise<void> {
       chatId,
       config.escalation.telegramTimeoutSeconds * 1000,
     );
+    const replyEvaluator = new ReplyEvaluator(config.escalation.evaluatorModel);
+    approvalManager.setReplyEvaluator(replyEvaluator, rulesPath);
     notifications = new NotificationManager(telegramBot, sessionTracker, config.telegram);
     log.info("Telegram bot configured");
   } else {
@@ -131,8 +134,23 @@ async function main(): Promise<void> {
 
   const escalationHandler = new EscalationHandler(config.escalation, approvalManager, policyStore);
 
+  // Watch rules file for hot-reload
+  let rulesReloadTimer: ReturnType<typeof setTimeout> | null = null;
+  watch(rulesPath, () => {
+    if (rulesReloadTimer) clearTimeout(rulesReloadTimer);
+    rulesReloadTimer = setTimeout(() => {
+      try {
+        const newConfig = loadRules(rulesPath);
+        ruleEngine = new RuleEngine(newConfig);
+        log.info("Rules reloaded", { path: rulesPath });
+      } catch (e) {
+        log.warn("Failed to reload rules, keeping previous", { error: String(e) });
+      }
+    }, 500);
+  });
+
   // Build hook handlers
-  const preToolUse = createPreToolUseHandler(ruleEngine, escalationHandler, auditLog, sessionTracker);
+  const preToolUse = createPreToolUseHandler(() => ruleEngine, escalationHandler, auditLog, sessionTracker);
   const stop = createStopHandler(config.stop, sessionTracker, approvalManager);
   const sessionStart = createSessionStartHandler(sessionTracker, notifications);
   const sessionEnd = createSessionEndHandler(sessionTracker, notifications);
@@ -158,6 +176,9 @@ async function main(): Promise<void> {
     await telegramBot.start();
     log.info("Telegram bot started");
   }
+
+  // Discover existing Claude tmux sessions
+  sessionTracker.registerFromTmux();
 
   console.log(`ClaudeCube listening on http://localhost:${port}`);
   console.log("Press Ctrl+C to stop.");

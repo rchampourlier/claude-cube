@@ -1,4 +1,4 @@
-import { resolveLabel } from "./tmux.js";
+import { resolveLabel, listClaudePanes } from "./tmux.js";
 import { createLogger } from "./util/logger.js";
 
 const log = createLogger("session-tracker");
@@ -55,12 +55,60 @@ export class SessionTracker {
     return this.sessions.get(sessionId)?.label ?? sessionId.slice(0, 12);
   }
 
-  /** Auto-register a session if it's not already tracked (e.g. after server restart). */
-  ensureRegistered(sessionId: string, cwd: string): void {
-    if (!this.sessions.has(sessionId)) {
-      this.register(sessionId, cwd);
-      log.info("Auto-registered unknown session", { sessionId });
+  /**
+   * Discover existing Claude tmux panes and register them as synthetic sessions.
+   * Called at startup so /status and /panes reflect existing sessions immediately.
+   */
+  registerFromTmux(): void {
+    const panes = listClaudePanes();
+    for (const pane of panes) {
+      const syntheticId = `tmux_${pane.paneId}`;
+      if (!this.findByCwd(pane.paneCwd)) {
+        this.sessions.set(syntheticId, {
+          sessionId: syntheticId,
+          cwd: pane.paneCwd,
+          startedAt: new Date().toISOString(),
+          state: "active",
+          lastToolName: null,
+          lastActivity: Date.now(),
+          denialCount: 0,
+          label: pane.windowName,
+        });
+        log.info("Registered tmux pane as synthetic session", { paneId: pane.paneId, label: pane.windowName });
+      }
     }
+  }
+
+  /** Find a session by its cwd. */
+  findByCwd(cwd: string): SessionInfo | undefined {
+    for (const session of this.sessions.values()) {
+      if (session.cwd === cwd) return session;
+    }
+    return undefined;
+  }
+
+  /**
+   * Auto-register a session if it's not already tracked.
+   * If a synthetic tmux session exists with the same cwd, merge into the real session.
+   */
+  ensureRegistered(sessionId: string, cwd: string): void {
+    if (this.sessions.has(sessionId)) return;
+
+    // Check for a synthetic session with the same cwd to merge
+    const existing = this.findByCwd(cwd);
+    if (existing && existing.sessionId.startsWith("tmux_")) {
+      // Merge: transfer label, startedAt, denialCount from synthetic
+      this.sessions.delete(existing.sessionId);
+      this.sessions.set(sessionId, {
+        ...existing,
+        sessionId,
+      });
+      log.info("Merged synthetic session into real", { sessionId, syntheticId: existing.sessionId, label: existing.label });
+      return;
+    }
+
+    this.register(sessionId, cwd);
+    log.info("Auto-registered unknown session", { sessionId });
   }
 
   updateState(sessionId: string, state: SessionState): void {

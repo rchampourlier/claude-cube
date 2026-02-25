@@ -26,7 +26,7 @@ export interface PreToolUseResponse {
 }
 
 export function createPreToolUseHandler(
-  ruleEngine: RuleEngine,
+  getRuleEngine: () => RuleEngine,
   escalationHandler: EscalationHandler,
   auditLog: AuditLog,
   sessionTracker: SessionTracker,
@@ -42,7 +42,7 @@ export function createPreToolUseHandler(
     sessionTracker.updateState(sessionId, "permission_pending");
 
     // Step 1: Rule engine evaluation
-    const result = ruleEngine.evaluate(toolName, toolInput);
+    const result = getRuleEngine().evaluate(toolName, toolInput);
 
     if (result.action === "allow") {
       auditLog.log({
@@ -99,6 +99,7 @@ export function createPreToolUseHandler(
       toolInput,
       {
         agentId: sessionId,
+        cwd: input.cwd,
         label: sessionTracker.getLabel(sessionId),
         rulesContext,
         escalationReason: result.reason,

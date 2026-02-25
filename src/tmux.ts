@@ -45,6 +45,15 @@ export function resolveLabel(cwd: string): string | null {
   return match.windowName;
 }
 
+/**
+ * Find the tmux pane ID running claude in the given cwd.
+ */
+export function findPaneForCwd(cwd: string): string | null {
+  const panes = listClaudePanes();
+  const match = panes.find((p) => p.paneCwd === cwd);
+  return match?.paneId ?? null;
+}
+
 export function sendKeys(paneTarget: string, text: string): void {
   try {
     execSync(`tmux send-keys -t ${JSON.stringify(paneTarget)} ${JSON.stringify(text)} Enter`, {

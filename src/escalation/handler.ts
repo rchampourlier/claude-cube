@@ -32,6 +32,7 @@ export class EscalationHandler {
     toolInput: Record<string, unknown>,
     context: {
       agentId: string;
+      cwd?: string;
       label?: string;
       rulesContext: string;
       escalationReason: string;
@@ -75,6 +76,8 @@ export class EscalationHandler {
       toolInput,
       {
         agentId: context.agentId,
+        sessionId: context.agentId,
+        cwd: context.cwd,
         label: context.label,
         reason: `LLM uncertain: ${llmResult.reason}`,
       },

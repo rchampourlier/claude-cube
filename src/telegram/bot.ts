@@ -68,22 +68,45 @@ export class TelegramBot {
         return;
       }
       const lines = panes.map(
-        (p) => `\`${p.paneId}\` — ${p.sessionName}:${p.windowIndex}.${p.paneIndex} (${p.command})`,
+        (p) => `${p.windowName} — \`${p.paneId}\``,
       );
       ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
     });
 
     this.bot.command("send", (ctx) => {
       const args = ctx.message.text.split(/\s+/).slice(1);
-      const paneTarget = args[0];
+      const windowTarget = args[0];
       const text = args.slice(1).join(" ");
-      if (!paneTarget || !text) {
-        ctx.reply("Usage: /send <pane-id> <text>");
+      if (!windowTarget || !text) {
+        ctx.reply("Usage: /send <window-name> <text>");
+        return;
+      }
+      const panes = listClaudePanes();
+      const matches = panes.filter((p) => p.windowName === windowTarget);
+      if (matches.length === 0) {
+        // Fall back to direct pane ID matching
+        const byId = panes.find((p) => p.paneId === windowTarget);
+        if (byId) {
+          try {
+            sendKeys(byId.paneId, text);
+            ctx.reply(`Sent to ${byId.windowName} (\`${byId.paneId}\`).`, { parse_mode: "Markdown" });
+          } catch (e) {
+            ctx.reply(`Failed: ${e}`);
+          }
+          return;
+        }
+        const available = panes.map((p) => p.windowName).join(", ");
+        ctx.reply(`No pane found for "${windowTarget}". Available: ${available || "none"}`);
+        return;
+      }
+      if (matches.length > 1) {
+        const list = matches.map((p) => `${p.windowName} — \`${p.paneId}\``).join("\n");
+        ctx.reply(`Multiple panes match "${windowTarget}":\n${list}\nUse the pane ID instead.`, { parse_mode: "Markdown" });
         return;
       }
       try {
-        sendKeys(paneTarget, text);
-        ctx.reply(`Sent to ${paneTarget}.`);
+        sendKeys(matches[0].paneId, text);
+        ctx.reply(`Sent to ${matches[0].windowName} (\`${matches[0].paneId}\`).`, { parse_mode: "Markdown" });
       } catch (e) {
         ctx.reply(`Failed: ${e}`);
       }

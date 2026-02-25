@@ -1,5 +1,7 @@
 import { Markup } from "telegraf";
 import type { TelegramBot } from "./bot.js";
+import type { ReplyEvaluator } from "./reply-evaluator.js";
+import { findPaneForCwd, sendKeys } from "../tmux.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("telegram-approval");
@@ -11,6 +13,15 @@ interface PendingApproval {
   createdAt: number;
 }
 
+export interface MessageContext {
+  approvalId: string;
+  sessionId: string;
+  paneId: string | null;
+  label: string;
+  /** Whether this is a stop decision (vs tool approval) */
+  isStop: boolean;
+}
+
 export interface ApprovalResult {
   approved: boolean;
   reason: string;
@@ -20,9 +31,11 @@ export interface ApprovalResult {
 
 export class ApprovalManager {
   private pending = new Map<string, PendingApproval>();
-  /** Map from Telegram message ID → pending approval ID, for text reply correlation */
-  private messageToApproval = new Map<number, string>();
+  /** Map from Telegram message ID → rich context for session routing */
+  private messageContext = new Map<number, MessageContext>();
   private counter = 0;
+  private replyEvaluator: ReplyEvaluator | null = null;
+  private rulesPath: string | null = null;
 
   constructor(
     private bot: TelegramBot,
@@ -31,6 +44,11 @@ export class ApprovalManager {
   ) {
     this.setupCallbackHandler();
     this.setupReplyHandler();
+  }
+
+  setReplyEvaluator(evaluator: ReplyEvaluator, rulesPath: string): void {
+    this.replyEvaluator = evaluator;
+    this.rulesPath = rulesPath;
   }
 
   private setupCallbackHandler(): void {
@@ -78,32 +96,115 @@ export class ApprovalManager {
   }
 
   private setupReplyHandler(): void {
-    // When the user replies to an approval message with text, treat as approval + policy
-    this.bot.callbackQuery.on("text", (ctx) => {
+    // When the user replies to an approval/stop message with text, evaluate intent via LLM
+    this.bot.callbackQuery.on("text", async (ctx) => {
       const replyTo = ctx.message.reply_to_message;
       if (!replyTo) return;
 
-      const approvalId = this.messageToApproval.get(replyTo.message_id);
-      if (!approvalId) return;
+      const msgCtx = this.messageContext.get(replyTo.message_id);
+      if (!msgCtx) return;
 
-      const pending = this.pending.get(approvalId);
+      const pending = this.pending.get(msgCtx.approvalId);
       if (!pending) return;
 
-      const policyText = ctx.message.text;
-      log.info("Text reply to approval — treating as policy", {
-        id: approvalId,
-        toolName: pending.toolName,
-        policyText: policyText.slice(0, 100),
-      });
-      this.cleanup(approvalId);
+      const replyText = ctx.message.text;
 
+      // Stop decisions: always forward the user's text as an answer to the agent
+      if (msgCtx.isStop) {
+        log.info("Text reply to stop decision — forwarding to agent", {
+          id: msgCtx.approvalId,
+          sessionId: msgCtx.sessionId,
+          text: replyText.slice(0, 100),
+        });
+        this.cleanup(msgCtx.approvalId);
+        pending.resolve({
+          approved: true,
+          reason: `User replied to agent question`,
+          policyText: replyText,
+        });
+        ctx.reply(`➡️ Forwarded to ${msgCtx.label}`, {
+          reply_parameters: { message_id: replyTo.message_id },
+        });
+        return;
+      }
+
+      // Tool approval replies: use LLM evaluator if available
+      if (this.replyEvaluator) {
+        try {
+          const evaluation = await this.replyEvaluator.evaluateReply(replyText, {
+            toolName: pending.toolName,
+            label: msgCtx.label,
+          });
+
+          log.info("Reply evaluated", {
+            id: msgCtx.approvalId,
+            intent: evaluation.intent,
+            text: replyText.slice(0, 100),
+          });
+
+          switch (evaluation.intent) {
+            case "approve":
+              this.cleanup(msgCtx.approvalId);
+              pending.resolve({ approved: true, reason: "Approved via Telegram reply" });
+              ctx.reply(`✅ Approved`, { reply_parameters: { message_id: replyTo.message_id } });
+              return;
+
+            case "deny":
+              this.cleanup(msgCtx.approvalId);
+              pending.resolve({ approved: false, reason: `Denied via Telegram: ${replyText}` });
+              ctx.reply(`❌ Denied`, { reply_parameters: { message_id: replyTo.message_id } });
+              return;
+
+            case "forward":
+              this.cleanup(msgCtx.approvalId);
+              pending.resolve({ approved: true, reason: "Approved + forwarded text to agent" });
+              if (msgCtx.paneId) {
+                sendKeys(msgCtx.paneId, evaluation.forwardText ?? replyText);
+                ctx.reply(`✅ Approved + forwarded to ${msgCtx.label}`, {
+                  reply_parameters: { message_id: replyTo.message_id },
+                });
+              } else {
+                ctx.reply(`✅ Approved (no pane found to forward to)`, {
+                  reply_parameters: { message_id: replyTo.message_id },
+                });
+              }
+              return;
+
+            case "add_rule":
+              this.cleanup(msgCtx.approvalId);
+              pending.resolve({ approved: true, reason: "Approved + rule added" });
+              if (evaluation.ruleYaml && this.rulesPath) {
+                const { appendFileSync } = await import("node:fs");
+                appendFileSync(this.rulesPath, `\n${evaluation.ruleYaml}\n`);
+                log.info("Rule appended to rules file", { path: this.rulesPath });
+                ctx.reply(`✅ Approved + rule added to config`, {
+                  reply_parameters: { message_id: replyTo.message_id },
+                });
+              } else {
+                ctx.reply(`✅ Approved (could not generate rule)`, {
+                  reply_parameters: { message_id: replyTo.message_id },
+                });
+              }
+              return;
+          }
+        } catch (e) {
+          log.warn("Reply evaluation failed, falling back to approve+policy", { error: String(e) });
+        }
+      }
+
+      // Fallback: treat as approval + policy (original behavior)
+      log.info("Text reply to approval — treating as policy", {
+        id: msgCtx.approvalId,
+        toolName: pending.toolName,
+        policyText: replyText.slice(0, 100),
+      });
+      this.cleanup(msgCtx.approvalId);
       pending.resolve({
         approved: true,
-        reason: `Approved via Telegram with policy: ${policyText}`,
-        policyText,
+        reason: `Approved via Telegram with policy: ${replyText}`,
+        policyText: replyText,
       });
-
-      ctx.reply(`✅ Approved + policy saved:\n"${policyText}"`, {
+      ctx.reply(`✅ Approved + policy saved:\n"${replyText}"`, {
         reply_parameters: { message_id: replyTo.message_id },
       });
     });
@@ -112,7 +213,7 @@ export class ApprovalManager {
   private cleanup(id: string): void {
     const pending = this.pending.get(id);
     if (pending?.messageId) {
-      this.messageToApproval.delete(pending.messageId);
+      this.messageContext.delete(pending.messageId);
     }
     this.pending.delete(id);
   }
@@ -120,9 +221,10 @@ export class ApprovalManager {
   async requestApproval(
     toolName: string,
     toolInput: Record<string, unknown>,
-    context: { agentId: string; label?: string; reason: string },
+    context: { agentId: string; sessionId?: string; cwd?: string; label?: string; reason: string },
   ): Promise<ApprovalResult> {
     const id = `req_${++this.counter}_${Date.now()}`;
+    const sessionId = context.sessionId ?? context.agentId;
 
     const inputSummary = formatToolInput(toolName, toolInput);
     const displayName = context.label ?? context.agentId.slice(0, 12);
@@ -137,7 +239,7 @@ export class ApprovalManager {
       inputSummary,
       `\`\`\``,
       ``,
-      `_Reply with text to approve \\+ create a policy rule\\._`,
+      `_Reply with text to approve \\+ create a policy\\._`,
     ].join("\n");
 
     const keyboard = Markup.inlineKeyboard([
@@ -163,7 +265,13 @@ export class ApprovalManager {
       const entry = this.pending.get(id);
       if (entry) {
         entry.messageId = sent.message_id;
-        this.messageToApproval.set(sent.message_id, id);
+        this.messageContext.set(sent.message_id, {
+          approvalId: id,
+          sessionId,
+          paneId: context.cwd ? findPaneForCwd(context.cwd) : null,
+          label: displayName,
+          isStop: false,
+        });
       }
     } catch (e) {
       log.error("Failed to send approval request", { error: String(e) });
@@ -193,6 +301,7 @@ export class ApprovalManager {
     sessionId: string,
     lastMessage: string,
     label?: string,
+    cwd?: string,
   ): Promise<ApprovalResult> {
     const id = `stop_${++this.counter}_${Date.now()}`;
 
@@ -233,7 +342,13 @@ export class ApprovalManager {
       const entry = this.pending.get(id);
       if (entry) {
         entry.messageId = sent.message_id;
-        this.messageToApproval.set(sent.message_id, id);
+        this.messageContext.set(sent.message_id, {
+          approvalId: id,
+          sessionId,
+          paneId: cwd ? findPaneForCwd(cwd) : null,
+          label: displayName,
+          isStop: true,
+        });
       }
     } catch (e) {
       log.error("Failed to send stop decision request", { error: String(e) });
