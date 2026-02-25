@@ -108,6 +108,10 @@ import { RuleEngine } from "./engine";           // wrong — will fail at runti
 - Match conditions are OR within a field (any pattern match = field matches), and the rule matches if the tool name matches AND any field's patterns match.
 - If a rule has no `match` block, it matches all uses of that tool.
 
+### Policies (human feedback)
+
+Policies are free-text instructions created from Telegram text replies, stored in `config/policies.yaml`, and fed to the LLM evaluator as context. They are distinct from **safety rules** (`config/rules.yaml`) which are deterministic regexp/glob/literal checks. See `src/policies/` and [08-policy-learning.md](specs/final/08-policy-learning.md).
+
 ### Telegram approval
 
 `ApprovalManager` uses a `Map<string, PendingApproval>` keyed by unique request IDs. Each `requestApproval()` call returns a `Promise` that resolves when the user taps a button or the timeout expires.

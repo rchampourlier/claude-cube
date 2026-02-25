@@ -127,6 +127,53 @@ Edit `config/rules.yaml`. Each rule has:
   reason: "Why this rule exists"
 ```
 
+### Policies (human feedback)
+
+Policies are a separate system from safety rules. While rules are deterministic regexp-based checks, **policies are free-text instructions** that you create from Telegram to teach the LLM evaluator your preferences over time.
+
+#### How it works
+
+1. A tool call escalates to Telegram (the LLM evaluator is uncertain or denies).
+2. You receive an approval message with Approve/Deny buttons.
+3. Instead of tapping a button, **reply with text** — your reply is saved as a policy and the tool call is approved.
+4. On future evaluations, the LLM evaluator sees your policies and can confidently approve matching tool calls without asking you again.
+
+#### Example
+
+You receive a Telegram approval for `npm install lodash`. Instead of tapping Approve, you reply:
+
+> Always allow npm install in this project
+
+This creates a policy scoped to the `Bash` tool. Next time a similar `npm install` is escalated, the LLM evaluator sees this policy, follows it, and auto-approves.
+
+#### Policies vs rules
+
+| | Rules (`config/rules.yaml`) | Policies (`config/policies.yaml`) |
+|---|---|---|
+| **Type** | Deterministic (regexp/glob/literal) | Advisory (free-text for LLM) |
+| **Speed** | Instant — no API call | Requires LLM evaluation |
+| **Creation** | Edit YAML manually, or `- add rule: ...` in Telegram reply | Reply with text to a Telegram approval |
+| **Effect** | Hard allow/deny/escalate | Influences LLM confidence and decision |
+| **Position** | Step 1 (before LLM) | Step 2 (within LLM evaluation) |
+
+#### Managing policies
+
+- **Create**: Reply with text to any Telegram approval request
+- **View**: Open `config/policies.yaml` (YAML file, created at runtime)
+- **Delete**: Edit `config/policies.yaml` directly (remove entries)
+- **Promote to rule**: When a policy is stable, convert it to a hard rule in `config/rules.yaml` for instant, deterministic evaluation. See [Policy-to-Rule Promotion](specs/final/08-policy-learning.md#85-policy-to-rule-promotion).
+
+#### Adding rules from Telegram
+
+To create a hard **rule** (not a policy) from Telegram, include the `- add rule:` directive in your reply:
+
+```
+Yes, allow it.
+- add rule: allow npm install commands
+```
+
+This approves the current tool call, forwards your text to the session, and also creates a new entry in `config/rules.yaml` (picked up automatically via hot-reload).
+
 ## Telegram commands
 
 Once the bot is running, you can control sessions from your phone:
@@ -169,9 +216,12 @@ src/
   tmux.ts                   # List Claude panes, send keys for text injection
   installer.ts              # Patches ~/.claude/settings.json with hooks
   rule-engine/
-    types.ts                # Zod schemas for rules
+    types.ts                # Zod schemas for safety rules
     parser.ts               # YAML loader + validation
     engine.ts               # Deny-first rule evaluator
+  policies/
+    types.ts                # Zod schemas for policies
+    store.ts                # In-memory + YAML-persisted policy store
   hooks/
     pre-tool-use.ts         # PreToolUse → RuleEngine → allow/deny/escalate
     stop.ts                 # Stop → error retry / Telegram escalation
@@ -193,5 +243,6 @@ hooks/
   claudecube-hook.sh        # Shell script called by Claude Code hooks
 config/
   rules.yaml                # Safety rules (edit this)
+  policies.yaml             # Policies from human feedback (created at runtime)
   orchestrator.yaml         # Server + escalation settings (edit this)
 ```
