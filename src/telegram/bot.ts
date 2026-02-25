@@ -52,13 +52,13 @@ export class TelegramBot {
       const lines = sessions.map((s) => {
         const age = Math.round((Date.now() - new Date(s.startedAt).getTime()) / 60000);
         return [
-          `*${escapeMarkdown(s.label)}*`,
+          `<b>${escapeHtml(s.label)}</b>`,
           `  State: ${s.state} | Denials: ${s.denialCount}`,
-          `  CWD: \`${s.cwd}\``,
+          `  CWD: <code>${escapeHtml(s.cwd)}</code>`,
           `  Last tool: ${s.lastToolName ?? "—"} | Age: ${age}m`,
         ].join("\n");
       });
-      ctx.reply(lines.join("\n\n"), { parse_mode: "Markdown" });
+      ctx.reply(lines.join("\n\n"), { parse_mode: "HTML" });
     });
 
     this.bot.command("panes", (ctx) => {
@@ -68,9 +68,9 @@ export class TelegramBot {
         return;
       }
       const lines = panes.map(
-        (p) => `${p.windowName} — \`${p.paneId}\``,
+        (p) => `${escapeHtml(p.windowName)} — <code>${escapeHtml(p.paneId)}</code>`,
       );
-      ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
+      ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
     });
 
     this.bot.command("send", (ctx) => {
@@ -89,7 +89,7 @@ export class TelegramBot {
         if (byId) {
           try {
             sendKeys(byId.paneId, text);
-            ctx.reply(`Sent to ${byId.windowName} (\`${byId.paneId}\`).`, { parse_mode: "Markdown" });
+            ctx.reply(`Sent to ${escapeHtml(byId.windowName)} (<code>${escapeHtml(byId.paneId)}</code>).`, { parse_mode: "HTML" });
           } catch (e) {
             ctx.reply(`Failed: ${e}`);
           }
@@ -100,13 +100,13 @@ export class TelegramBot {
         return;
       }
       if (matches.length > 1) {
-        const list = matches.map((p) => `${p.windowName} — \`${p.paneId}\``).join("\n");
-        ctx.reply(`Multiple panes match "${windowTarget}":\n${list}\nUse the pane ID instead.`, { parse_mode: "Markdown" });
+        const list = matches.map((p) => `${escapeHtml(p.windowName)} — <code>${escapeHtml(p.paneId)}</code>`).join("\n");
+        ctx.reply(`Multiple panes match "${escapeHtml(windowTarget)}":\n${list}\nUse the pane ID instead.`, { parse_mode: "HTML" });
         return;
       }
       try {
         sendKeys(matches[0].paneId, text);
-        ctx.reply(`Sent to ${matches[0].windowName} (\`${matches[0].paneId}\`).`, { parse_mode: "Markdown" });
+        ctx.reply(`Sent to ${escapeHtml(matches[0].windowName)} (<code>${escapeHtml(matches[0].paneId)}</code>).`, { parse_mode: "HTML" });
       } catch (e) {
         ctx.reply(`Failed: ${e}`);
       }
@@ -155,7 +155,7 @@ export class TelegramBot {
     this.started = false;
   }
 
-  async sendMessage(text: string, parseMode?: "Markdown" | "HTML"): Promise<void> {
+  async sendMessage(text: string, parseMode?: "HTML"): Promise<void> {
     await this.bot.telegram.sendMessage(this.chatId, text, {
       parse_mode: parseMode,
     });
@@ -170,6 +170,6 @@ export class TelegramBot {
   }
 }
 
-function escapeMarkdown(text: string): string {
-  return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

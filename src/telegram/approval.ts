@@ -229,17 +229,15 @@ export class ApprovalManager {
     const inputSummary = formatToolInput(toolName, toolInput);
     const displayName = context.label ?? context.agentId.slice(0, 12);
     const message = [
-      `🔔 *Permission Request*`,
+      `🔔 <b>Permission Request</b>`,
       ``,
-      `*Session:* \`${displayName}\``,
-      `*Tool:* \`${toolName}\``,
-      `*Reason:* ${context.reason}`,
+      `<b>Session:</b> <code>${escapeHtml(displayName)}</code>`,
+      `<b>Tool:</b> <code>${escapeHtml(toolName)}</code>`,
+      `<b>Reason:</b> ${escapeHtml(context.reason)}`,
       ``,
-      `\`\`\``,
-      inputSummary,
-      `\`\`\``,
+      `<pre>${escapeHtml(inputSummary)}</pre>`,
       ``,
-      `_Reply with text to approve \\+ create a policy\\._`,
+      `<i>Reply with text to approve + create a policy.</i>`,
     ].join("\n");
 
     const keyboard = Markup.inlineKeyboard([
@@ -260,7 +258,7 @@ export class ApprovalManager {
       const sent = await this.bot.telegram.sendMessage(
         this.chatId,
         message,
-        { parse_mode: "Markdown", ...keyboard },
+        { parse_mode: "HTML", ...keyboard },
       );
       const entry = this.pending.get(id);
       if (entry) {
@@ -288,7 +286,7 @@ export class ApprovalManager {
           resolve({ approved: false, reason: "Telegram approval timed out" });
 
           this.bot
-            .sendMessage(`⏰ Approval request for \`${toolName}\` timed out (denied).`, "Markdown")
+            .sendMessage(`⏰ Approval request for <code>${escapeHtml(toolName)}</code> timed out (denied).`, "HTML")
             .catch(() => {});
         }
       }, this.timeoutMs);
@@ -308,16 +306,14 @@ export class ApprovalManager {
     const truncated = lastMessage.length > 800 ? lastMessage.slice(-800) : lastMessage;
     const displayName = label ?? sessionId.slice(0, 12);
     const message = [
-      `🛑 *Agent stopped*`,
+      `🛑 <b>Agent stopped</b>`,
       ``,
-      `*Session:* \`${displayName}\``,
+      `<b>Session:</b> <code>${escapeHtml(displayName)}</code>`,
       ``,
       `Last message:`,
-      `\`\`\``,
-      escapeMarkdownCodeBlock(truncated),
-      `\`\`\``,
+      `<pre>${escapeHtml(truncated)}</pre>`,
       ``,
-      `_Reply with text to answer the agent and force\\-continue\\._`,
+      `<i>Reply with text to answer the agent and force-continue.</i>`,
     ].join("\n");
 
     const keyboard = Markup.inlineKeyboard([
@@ -337,7 +333,7 @@ export class ApprovalManager {
       const sent = await this.bot.telegram.sendMessage(
         this.chatId,
         message,
-        { parse_mode: "Markdown", ...keyboard },
+        { parse_mode: "HTML", ...keyboard },
       );
       const entry = this.pending.get(id);
       if (entry) {
@@ -389,7 +385,6 @@ function formatToolInput(toolName: string, input: Record<string, unknown>): stri
   }
 }
 
-function escapeMarkdownCodeBlock(text: string): string {
-  // Only need to escape backticks inside code blocks
-  return text.replace(/`/g, "'");
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

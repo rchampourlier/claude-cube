@@ -20,33 +20,33 @@ export class NotificationManager {
     if (!this.config.notifyOnStart) return;
     const label = this.sessionTracker.getLabel(sessionId);
     await this.send(
-      `*Session started*\n\`${label}\`\nCWD: \`${escapeMarkdown(cwd)}\``,
+      `<b>Session started</b>\n<code>${escapeHtml(label)}</code>\nCWD: <code>${escapeHtml(cwd)}</code>`,
     );
   }
 
   async sessionEnded(sessionId: string): Promise<void> {
     if (!this.config.notifyOnComplete) return;
     const label = this.sessionTracker.getLabel(sessionId);
-    await this.send(`*Session ended*\n\`${label}\``);
+    await this.send(`<b>Session ended</b>\n<code>${escapeHtml(label)}</code>`);
   }
 
   async denialAlert(sessionId: string, denialCount: number, lastTool: string): Promise<void> {
     if (denialCount < this.config.denialAlertThreshold) return;
     const label = this.sessionTracker.getLabel(sessionId);
     await this.send(
-      `*Denial alert*\n\`${label}\` has been denied ${denialCount} times\\.\nLast tool: \`${lastTool}\`\nThe session may be stuck\\.`,
+      `<b>Denial alert</b>\n<code>${escapeHtml(label)}</code> has been denied ${denialCount} times.\nLast tool: <code>${escapeHtml(lastTool)}</code>\nThe session may be stuck.`,
     );
   }
 
   private async send(text: string): Promise<void> {
     try {
-      await this.bot.sendMessage(text, "Markdown");
+      await this.bot.sendMessage(text, "HTML");
     } catch (e) {
       log.error("Failed to send notification", { error: String(e) });
     }
   }
 }
 
-function escapeMarkdown(text: string): string {
-  return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
