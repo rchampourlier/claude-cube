@@ -113,9 +113,14 @@ export class TelegramBot {
     });
 
     // Free-text messages — inject into first Claude pane
-    this.bot.on("text", (ctx) => {
+    // Replies to existing messages are handled by ApprovalManager's reply handler
+    this.bot.on("text", (ctx, next) => {
       const text = ctx.message.text;
       if (text.startsWith("/")) return;
+
+      // If this is a reply to a message, let the approval reply handler process it
+      if (ctx.message.reply_to_message) return next();
+
       log.info("Received free text", { text: text.slice(0, 100) });
 
       const panes = listClaudePanes();

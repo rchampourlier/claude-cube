@@ -33,6 +33,7 @@ export class EscalationHandler {
     context: {
       agentId: string;
       cwd?: string;
+      paneId?: string | null;
       label?: string;
       rulesContext: string;
       escalationReason: string;
@@ -78,6 +79,7 @@ export class EscalationHandler {
         agentId: context.agentId,
         sessionId: context.agentId,
         cwd: context.cwd,
+        paneId: context.paneId,
         label: context.label,
         reason: `LLM uncertain: ${llmResult.reason}`,
       },

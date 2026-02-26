@@ -1,4 +1,4 @@
-import { resolveLabel, listClaudePanes } from "./tmux.js";
+import { resolveLabel, listClaudePanes, findPaneForCwd } from "./tmux.js";
 import { createLogger } from "./util/logger.js";
 
 const log = createLogger("session-tracker");
@@ -15,6 +15,8 @@ export interface SessionInfo {
   denialCount: number;
   /** Human-readable label, e.g. "main:claude-cube" from tmux window name */
   label: string;
+  /** tmux pane ID (e.g. "%73"), captured at registration time */
+  paneId: string | null;
 }
 
 export class SessionTracker {
@@ -32,6 +34,7 @@ export class SessionTracker {
       lastActivity: Date.now(),
       denialCount: 0,
       label,
+      paneId: findPaneForCwd(cwd),
     });
     log.info("Session registered", { sessionId, label, cwd });
   }
@@ -55,6 +58,11 @@ export class SessionTracker {
     return this.sessions.get(sessionId)?.label ?? sessionId.slice(0, 12);
   }
 
+  /** Get the tmux pane ID for a session, if known. */
+  getPaneId(sessionId: string): string | null {
+    return this.sessions.get(sessionId)?.paneId ?? null;
+  }
+
   /**
    * Discover existing Claude tmux panes and register them as synthetic sessions.
    * Called at startup so /status and /panes reflect existing sessions immediately.
@@ -73,6 +81,7 @@ export class SessionTracker {
           lastActivity: Date.now(),
           denialCount: 0,
           label: pane.windowName,
+          paneId: pane.paneId,
         });
         log.info("Registered tmux pane as synthetic session", { paneId: pane.paneId, label: pane.windowName });
       }

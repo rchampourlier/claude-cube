@@ -35,7 +35,6 @@ export class ApprovalManager {
   private messageContext = new Map<number, MessageContext>();
   private counter = 0;
   private replyEvaluator: ReplyEvaluator | null = null;
-  private rulesPath: string | null = null;
 
   constructor(
     private bot: TelegramBot,
@@ -46,9 +45,8 @@ export class ApprovalManager {
     this.setupReplyHandler();
   }
 
-  setReplyEvaluator(evaluator: ReplyEvaluator, rulesPath: string): void {
+  setReplyEvaluator(evaluator: ReplyEvaluator): void {
     this.replyEvaluator = evaluator;
-    this.rulesPath = rulesPath;
   }
 
   private setupCallbackHandler(): void {
@@ -170,22 +168,19 @@ export class ApprovalManager {
               }
               return;
 
-            case "add_rule":
+            case "add_policy": {
+              const policyText = evaluation.policyText ?? replyText;
               this.cleanup(msgCtx.approvalId);
-              pending.resolve({ approved: true, reason: "Approved + rule added" });
-              if (evaluation.ruleYaml && this.rulesPath) {
-                const { appendFileSync } = await import("node:fs");
-                appendFileSync(this.rulesPath, `\n${evaluation.ruleYaml}\n`);
-                log.info("Rule appended to rules file", { path: this.rulesPath });
-                ctx.reply(`✅ Approved + rule added to config`, {
-                  reply_parameters: { message_id: replyTo.message_id },
-                });
-              } else {
-                ctx.reply(`✅ Approved (could not generate rule)`, {
-                  reply_parameters: { message_id: replyTo.message_id },
-                });
-              }
+              pending.resolve({
+                approved: true,
+                reason: `Approved via Telegram with policy: ${policyText}`,
+                policyText,
+              });
+              ctx.reply(`✅ Approved + policy saved:\n"${policyText}"`, {
+                reply_parameters: { message_id: replyTo.message_id },
+              });
               return;
+            }
           }
         } catch (e) {
           log.warn("Reply evaluation failed, falling back to approve+policy", { error: String(e) });
@@ -221,7 +216,7 @@ export class ApprovalManager {
   async requestApproval(
     toolName: string,
     toolInput: Record<string, unknown>,
-    context: { agentId: string; sessionId?: string; cwd?: string; label?: string; reason: string },
+    context: { agentId: string; sessionId?: string; cwd?: string; paneId?: string | null; label?: string; reason: string },
   ): Promise<ApprovalResult> {
     const id = `req_${++this.counter}_${Date.now()}`;
     const sessionId = context.sessionId ?? context.agentId;
@@ -266,7 +261,7 @@ export class ApprovalManager {
         this.messageContext.set(sent.message_id, {
           approvalId: id,
           sessionId,
-          paneId: context.cwd ? findPaneForCwd(context.cwd) : null,
+          paneId: context.paneId ?? (context.cwd ? findPaneForCwd(context.cwd) : null),
           label: displayName,
           isStop: false,
         });
@@ -300,6 +295,7 @@ export class ApprovalManager {
     lastMessage: string,
     label?: string,
     cwd?: string,
+    paneId?: string | null,
   ): Promise<ApprovalResult> {
     const id = `stop_${++this.counter}_${Date.now()}`;
 
@@ -341,7 +337,7 @@ export class ApprovalManager {
         this.messageContext.set(sent.message_id, {
           approvalId: id,
           sessionId,
-          paneId: cwd ? findPaneForCwd(cwd) : null,
+          paneId: paneId ?? (cwd ? findPaneForCwd(cwd) : null),
           label: displayName,
           isStop: true,
         });

@@ -71,7 +71,7 @@ export function createStopHandler(
       log.info("Agent stopped with a question, forwarding to Telegram", undefined, label);
 
       // Send the actual question to Telegram and wait for a reply
-      const result = await approvalManager.requestStopDecision(sessionId, lastMessage, label, input.cwd);
+      const result = await approvalManager.requestStopDecision(sessionId, lastMessage, label, input.cwd, sessionTracker.getPaneId(sessionId));
 
       if (result.approved) {
         // If the human replied with text, use that as the answer

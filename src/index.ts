@@ -125,7 +125,7 @@ async function main(): Promise<void> {
       config.escalation.telegramTimeoutSeconds * 1000,
     );
     const replyEvaluator = new ReplyEvaluator(config.escalation.evaluatorModel);
-    approvalManager.setReplyEvaluator(replyEvaluator, rulesPath);
+    approvalManager.setReplyEvaluator(replyEvaluator);
     notifications = new NotificationManager(telegramBot, sessionTracker, config.telegram);
     log.info("Telegram bot configured");
   } else {

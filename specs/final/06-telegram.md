@@ -183,30 +183,25 @@ The LLM classifies the reply into one of these intents:
 | **Approve** | Approve the tool call. Resolve the pending request with `approved: true`. |
 | **Deny** | Deny the tool call. Resolve with `approved: false`. |
 | **Forward to session** | Approve the tool call AND forward the text to the Claude session via tmux (using the message-to-session mapping). |
-| **Add rule** | Approve the tool call AND create a new safety rule in `config/rules.yaml`. |
+| **Add policy** | Approve the tool call AND create a soft policy in the [PolicyStore](08-policy-learning.md) for future LLM evaluations. |
 
 ### Explicit Syntax Convention
 
 To reduce ambiguity, the user can use explicit directives in their reply:
 
 - **Plain text**: Forwarded to the Claude session as guidance (implicit approve).
-- **`- add rule: <description>`**: Triggers safety rule creation in `config/rules.yaml`. Can appear after the main reply text.
+- **`add policy: <description>`**: Triggers soft policy creation in the PolicyStore. The policy is included in future LLM evaluations.
 
 Example reply:
 ```
-Yes, allow it. The npm install is needed for the build.
-- add rule: allow npm install commands
+approve. add policy: it's ok to push on the default repository, as long as it's not a force-push
 ```
 
-This would: approve the tool call, forward "Yes, allow it. The npm install is needed for the build." to the session, and create a safety rule for `npm install`.
+This would: approve the tool call and save "it's ok to push on the default repository, as long as it's not a force-push" as a policy for the LLM evaluator.
 
-### Safety Rule Creation from Text
+### Policy-to-Rule Promotion
 
-When a `- add rule:` directive is detected:
-1. An LLM extracts the structured rule fields (action, tool, match patterns) from the natural-language description.
-2. The rule is appended to `config/rules.yaml`.
-3. The [hot-reload mechanism](02-safety-rules.md#25-hot-reload-support) picks up the change automatically.
-4. A confirmation message is sent to Telegram.
+Policies are soft guidance for the LLM evaluator. Over time, stable policies can be promoted to hard rules in `config/rules.yaml` via a dedicated skill. See [Policy Learning](08-policy-learning.md) for details.
 
 ### Stop Decision Text Replies
 
@@ -277,7 +272,6 @@ This uses the `listClaudePanes()` and `sendKeys()` functions from `src/tmux.ts` 
 
 - The approval flow is invoked by the [Escalation Handler](04-llm-evaluation.md) when the LLM is uncertain or denies.
 - The stop decision flow is invoked by the [Stop Handler](05-stop-handling.md) when a question is detected.
-- Safety rule creation from `- add rule:` text replies interacts with the [Safety Rule System](02-safety-rules.md) and its hot-reload mechanism.
-- Policy creation from plain text replies feeds into the [Policy Learning](08-policy-learning.md) system.
+- Policy creation from text replies feeds into the [Policy Learning](08-policy-learning.md) system.
 - Session notifications are triggered by [Lifecycle Hooks](07-session-management.md).
 - Tmux functions are described in [Session Management](07-session-management.md).

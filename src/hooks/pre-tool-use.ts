@@ -100,6 +100,7 @@ export function createPreToolUseHandler(
       {
         agentId: sessionId,
         cwd: input.cwd,
+        paneId: sessionTracker.getPaneId(sessionId),
         label: sessionTracker.getLabel(sessionId),
         rulesContext,
         escalationReason: result.reason,
