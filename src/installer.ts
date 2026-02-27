@@ -28,8 +28,8 @@ function getHookCommand(): string {
 function buildHookEntries(): Record<HookEventName, HookMatcher> {
   const command = getHookCommand();
   return {
-    PreToolUse: { hooks: [{ type: "command", command, timeout: 120 }] },
-    Stop: { hooks: [{ type: "command", command, timeout: 30 }] },
+    PreToolUse: { hooks: [{ type: "command", command, timeout: 360 }] },
+    Stop: { hooks: [{ type: "command", command, timeout: 360 }] },
     SessionStart: { hooks: [{ type: "command", command, timeout: 5 }] },
     SessionEnd: { hooks: [{ type: "command", command, timeout: 5 }] },
     Notification: { hooks: [{ type: "command", command, timeout: 5 }] },

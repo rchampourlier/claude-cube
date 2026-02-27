@@ -57,8 +57,8 @@ Each event gets a hook entry pointing to the absolute path of `hooks/claudecube-
 
 | Event | Timeout (seconds) |
 |---|---|
-| `PreToolUse` | 120 |
-| `Stop` | 30 |
+| `PreToolUse` | 360 |
+| `Stop` | 360 |
 | `SessionStart` | 5 |
 | `SessionEnd` | 5 |
 | `Notification` | 5 |
@@ -72,7 +72,7 @@ Claude Code expects hooks in the format:
     "PreToolUse": [
       {
         "hooks": [
-          { "type": "command", "command": "/absolute/path/to/claudecube-hook.sh", "timeout": 120 }
+          { "type": "command", "command": "/absolute/path/to/claudecube-hook.sh", "timeout": 360 }
         ]
       }
     ]
@@ -120,7 +120,7 @@ This is a deliberate design choice: developer productivity is prioritized over e
 
 ### Timeout
 
-`curl --max-time 60` limits the HTTP request to 60 seconds. Note: this is shorter than the Telegram approval timeout (300s), meaning Telegram approvals for PreToolUse events cannot wait the full 5 minutes.
+`curl --max-time 330` limits the HTTP request to 330 seconds (5.5 minutes). This exceeds the Telegram approval timeout (300s) to ensure the hook script waits long enough for human responses before timing out.
 
 ## 10.4 CLI Entry Point and Bootstrap
 

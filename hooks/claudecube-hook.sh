@@ -14,7 +14,7 @@ fi
 
 CLAUDECUBE_PORT="${CLAUDECUBE_PORT:-7080}"
 
-RESPONSE=$(echo "$INPUT" | curl -s --max-time 60 \
+RESPONSE=$(echo "$INPUT" | curl -s --max-time 330 \
   -X POST -H "Content-Type: application/json" \
   -d @- "http://localhost:${CLAUDECUBE_PORT}/hooks/$EVENT" 2>/dev/null)
 
