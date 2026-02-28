@@ -35,7 +35,7 @@ An empty object `{}` means "let the session stop normally."
 ### Complete Decision Flow
 
 ```
-1. ensureRegistered(sessionId, cwd)
+1. ensureRegistered(sessionId, cwd, transcriptPath)
 
 2. stop_hook_active check
    |-- true --> return {} (prevent infinite loops)
@@ -50,19 +50,25 @@ An empty object `{}` means "let the session stop normally."
    |     |     --> return { decision: "block",
    |     |                  reason: "Try a different approach" }
    |     |-- retries >= maxRetries
-   |           --> clear retries, return {} (let stop)
+   |           --> clear retries, FALL THROUGH to step 5
 
-5. Question detection heuristic
-   |-- matches question AND config.escalateToTelegram AND approvalManager?
-   |     --> requestStopDecision(sessionId, lastMessage, label)
+5. Transcript analysis + Telegram escalation
+   |-- config.escalateToTelegram AND approvalManager?
+   |     --> Read transcript (last 15 messages)
+   |     --> Generate LLM summary (graceful degradation on failure)
+   |     --> Extract recent tools from transcript
+   |     --> requestStopDecision(sessionId, lastMessage, label, cwd, paneId,
+   |                             { summary, recentTools })
    |     |-- approved with text --> return { decision: "block",
    |     |                                   reason: "User answered: <text>" }
    |     |-- approved (button) ---> return { decision: "block",
    |     |                                   reason: "User wants you to continue" }
    |     |-- denied/timeout ------> return {} (let stop)
 
-6. Default --> clear retries, return {} (let stop)
+6. No Telegram --> clear retries, return {} (let stop)
 ```
+
+**Key change**: All stops (after retry exhaustion, questions, and normal completions) go through transcript analysis + Telegram escalation when `escalateToTelegram` is enabled. The previous behavior of only escalating questions is replaced by universal escalation with transcript context.
 
 ## 5.2 Error Retry Logic
 
@@ -91,8 +97,8 @@ const retryCount = new Map<string, number>();
 ```
 
 - On error detection: increment and check against `config.maxRetries`.
-- On max retries reached: clear the session's retry count and let it stop.
-- On normal stop (non-error): clear the session's retry count.
+- On max retries reached: clear the session's retry count and fall through to transcript analysis + Telegram.
+- On normal stop (non-error): fall through to transcript analysis + Telegram (retry count cleared when no Telegram is available).
 
 ### Retry Message
 
@@ -106,30 +112,43 @@ When forcing a retry, the handler returns:
 
 This message is passed back to Claude Code, which treats the blocked stop as an instruction to continue with the provided reason as guidance.
 
-## 5.3 Question Escalation
+## 5.3 Transcript Analysis + Telegram Escalation
 
-### Question Detection Heuristic
+All stops (after error retries are exhausted, on questions, and on normal completions) are escalated to Telegram with transcript analysis when `escalateToTelegram` is enabled.
+
+### Transcript Analysis
+
+Before sending the Telegram message, the handler:
+1. Reads the transcript (last 15 messages) via `readTranscript()`.
+2. Generates an LLM summary via `summarizeTranscript()`.
+3. Extracts recent tool names via `extractRecentTools()`.
+
+All analysis steps degrade gracefully: if the transcript path is unavailable, the file is unreadable, or the LLM call fails, the stop flow continues without the failed component. See [Transcript Analysis](11-transcript-analysis.md) for details.
+
+### Stop Message Format
 
 ```
-/\?$|\bshould I\b|\bwould you like\b|\bdo you want/i
+🛑 Agent stopped — <label>
+
+📋 Summary:
+<LLM-generated summary>
+
+Last message:
+<last 800 chars of assistant message>
+
+Recent tools: Edit(src/foo.ts), Bash(npm test), Read(package.json)
+
+Reply to send instructions. Buttons to continue or let stop.
+[▶️ Continue] [⏹️ Let stop]
 ```
 
-Tests against the trimmed last message. Matches:
-- Messages ending with `?`
-- Messages containing "should I", "would you like", "do you want"
+The summary and recent tools lines are omitted when transcript analysis is unavailable.
 
 ### Telegram Flow
 
-When a question is detected and Telegram escalation is enabled:
-1. Call `approvalManager.requestStopDecision(sessionId, lastMessage, label)`.
-2. The Telegram message shows the agent's last message (truncated to 800 chars) with "Continue" and "Let stop" buttons.
+1. Call `approvalManager.requestStopDecision(sessionId, lastMessage, label, cwd, paneId, { summary, recentTools })`.
+2. The Telegram message shows the LLM summary, last message (truncated to 800 chars), recent tools, and "Continue" / "Let stop" buttons.
 3. If the user replies with text, the handler returns it as the agent's "answer" via the block reason.
-
-### Follow-Up Suggestions (Future Enhancement)
-
-Claude Code does not include suggested follow-up actions in the Stop hook payload. A future enhancement could parse `transcript_path` to extract suggested actions (if present) and:
-- Display them as additional buttons in the Telegram message.
-- Use the first suggested action as the "Continue" button's payload instead of a generic "continue" message.
 
 ## 5.4 Stop Loop Prevention
 
@@ -162,4 +181,5 @@ stop:
 
 - The stop handler is invoked by the HTTP server when a `Stop` event is received (see [Infrastructure](10-infrastructure.md)).
 - Telegram stop decisions use the `ApprovalManager` described in [Telegram Integration](06-telegram.md).
+- Transcript analysis (reader, summarizer, graceful degradation) is described in [Transcript Analysis](11-transcript-analysis.md).
 - Configuration is described in [Configuration](09-configuration.md).

@@ -17,12 +17,14 @@ export interface SessionInfo {
   label: string;
   /** tmux pane ID (e.g. "%73"), captured at registration time */
   paneId: string | null;
+  /** Path to Claude Code's JSONL transcript file for this session */
+  transcriptPath: string | null;
 }
 
 export class SessionTracker {
   private sessions = new Map<string, SessionInfo>();
 
-  register(sessionId: string, cwd: string): void {
+  register(sessionId: string, cwd: string, transcriptPath?: string): void {
     const tmuxLabel = resolveLabel(cwd);
     const label = tmuxLabel ?? sessionId.slice(0, 12);
     this.sessions.set(sessionId, {
@@ -35,6 +37,7 @@ export class SessionTracker {
       denialCount: 0,
       label,
       paneId: findPaneForCwd(cwd),
+      transcriptPath: transcriptPath ?? null,
     });
     log.info("Session registered", { sessionId, label, cwd });
   }
@@ -82,10 +85,16 @@ export class SessionTracker {
           denialCount: 0,
           label: pane.windowName,
           paneId: pane.paneId,
+          transcriptPath: null,
         });
         log.info("Registered tmux pane as synthetic session", { paneId: pane.paneId, label: pane.windowName });
       }
     }
+  }
+
+  /** Get the transcript path for a session, if known. */
+  getTranscriptPath(sessionId: string): string | null {
+    return this.sessions.get(sessionId)?.transcriptPath ?? null;
   }
 
   /** Find a session by its cwd. */
@@ -100,23 +109,31 @@ export class SessionTracker {
    * Auto-register a session if it's not already tracked.
    * If a synthetic tmux session exists with the same cwd, merge into the real session.
    */
-  ensureRegistered(sessionId: string, cwd: string): void {
-    if (this.sessions.has(sessionId)) return;
-
-    // Check for a synthetic session with the same cwd to merge
-    const existing = this.findByCwd(cwd);
-    if (existing && existing.sessionId.startsWith("tmux_")) {
-      // Merge: transfer label, startedAt, denialCount from synthetic
-      this.sessions.delete(existing.sessionId);
-      this.sessions.set(sessionId, {
-        ...existing,
-        sessionId,
-      });
-      log.info("Merged synthetic session into real", { sessionId, syntheticId: existing.sessionId, label: existing.label });
+  ensureRegistered(sessionId: string, cwd: string, transcriptPath?: string): void {
+    const existing = this.sessions.get(sessionId);
+    if (existing) {
+      // Store transcriptPath when first provided
+      if (transcriptPath && !existing.transcriptPath) {
+        existing.transcriptPath = transcriptPath;
+      }
       return;
     }
 
-    this.register(sessionId, cwd);
+    // Check for a synthetic session with the same cwd to merge
+    const synthetic = this.findByCwd(cwd);
+    if (synthetic && synthetic.sessionId.startsWith("tmux_")) {
+      // Merge: transfer label, startedAt, denialCount from synthetic
+      this.sessions.delete(synthetic.sessionId);
+      this.sessions.set(sessionId, {
+        ...synthetic,
+        sessionId,
+        transcriptPath: transcriptPath ?? null,
+      });
+      log.info("Merged synthetic session into real", { sessionId, syntheticId: synthetic.sessionId, label: synthetic.label });
+      return;
+    }
+
+    this.register(sessionId, cwd, transcriptPath);
     log.info("Auto-registered unknown session", { sessionId });
   }
 

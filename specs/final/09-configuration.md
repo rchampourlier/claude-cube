@@ -64,7 +64,7 @@ All fields have `.default()` values, making every field optional in the YAML.
 |---|---|---|---|
 | `retryOnError` | boolean | `true` | Auto-retry when agent stops with an error |
 | `maxRetries` | integer >= 0 | `2` | Max consecutive retries before allowing stop |
-| `escalateToTelegram` | boolean | `true` | Forward agent questions to Telegram |
+| `escalateToTelegram` | boolean | `true` | Escalate all stops to Telegram with transcript analysis (questions, errors after retries, normal completions) |
 
 ### Loading (from `src/config/loader.ts`)
 

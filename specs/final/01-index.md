@@ -37,16 +37,19 @@ HTTP Server (server.ts)
   |                                        |-- uncertain/deny --> Telegram approval
   |                                                                |-- button approve -> APPROVE
   |                                                                |-- button deny/timeout -> BLOCK
+  |                                                                |-- details button -> Transcript analysis
+  |                                                                |                     + LLM summary (non-resolving)
   |                                                                |-- text reply -> LLM classifies intent:
   |                                                                      |-- approve -> APPROVE
   |                                                                      |-- deny -> BLOCK
   |                                                                      |-- forward -> APPROVE + send to session
   |                                                                      |-- add rule -> APPROVE + write rule
   |
-  |-- Stop -----------> Heuristics (error? question?)
+  |-- Stop -----------> Heuristics (error? question? normal?)
   |                       |-- error -> force retry (up to N times)
-  |                       |-- question -> Telegram (continue/let stop)
-  |                       |-- normal -> let stop
+  |                       |   (after retries exhausted, falls through to analysis)
+  |                       |-- ALL stops (after retries) -> Transcript analysis
+  |                           + LLM summary + Telegram (continue/let stop)
   |
   |-- SessionStart ----> Register session + Telegram notification
   |-- SessionEnd ------> Deregister session + Telegram notification
@@ -75,6 +78,7 @@ On startup:
 | 8 | [Policy Learning](08-policy-learning.md) | Policy creation, storage, LLM feedback loop, policy-to-rule promotion |
 | 9 | [Configuration](09-configuration.md) | Orchestrator config, rules config, environment variables |
 | 10 | [Infrastructure & Deployment](10-infrastructure.md) | HTTP server, CLI, installer, logging, project setup |
+| 11 | [Transcript Analysis](11-transcript-analysis.md) | Transcript reader, LLM summarizer, integration with approval and stop flows |
 
 ## Supplementary Documents
 

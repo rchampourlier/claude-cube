@@ -31,9 +31,9 @@ export function createSessionStartHandler(
   notifications: NotificationManager | null,
 ) {
   return async (input: SessionStartInput): Promise<Record<string, never>> => {
-    const { session_id: sessionId, cwd } = input;
+    const { session_id: sessionId, cwd, transcript_path: transcriptPath } = input;
     log.info("SessionStart", { sessionId, cwd });
-    sessionTracker.register(sessionId, cwd);
+    sessionTracker.register(sessionId, cwd, transcriptPath);
     await notifications?.sessionStarted(sessionId, cwd);
     return {};
   };

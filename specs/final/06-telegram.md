@@ -114,10 +114,13 @@ interface ApprovalResult {
 }
 
 class ApprovalManager {
-  constructor(bot: TelegramBot, chatId: string, timeoutMs: number = 300_000);
+  constructor(bot: TelegramBot, chatId: string, timeoutMs: number = 300_000,
+              sessionTracker: SessionTracker | null = null);
   async requestApproval(toolName: string, toolInput: Record<string, unknown>,
                         context: { agentId: string; label?: string; reason: string }): Promise<ApprovalResult>;
-  async requestStopDecision(sessionId: string, lastMessage: string, label?: string): Promise<ApprovalResult>;
+  async requestStopDecision(sessionId: string, lastMessage: string, label?: string,
+                            cwd?: string, paneId?: string | null,
+                            options?: { summary?: string; recentTools?: string }): Promise<ApprovalResult>;
   get pendingCount(): number;
 }
 ```
@@ -139,7 +142,7 @@ Reply with text to approve + create a policy.
 Use "- add rule: <description>" to also create a safety rule.
 ```
 
-With inline buttons: **[Approve]** | **[Deny]**
+With inline buttons: **[Approve]** | **[Deny]** | **[Details]**
 
 ### Tool Input Formatting
 
@@ -154,6 +157,7 @@ The tool input is formatted differently depending on the tool:
 |---|---|
 | Tap "Approve" | `{ approved: true, reason: "Approved via Telegram" }` |
 | Tap "Deny" | `{ approved: false, reason: "Denied via Telegram" }` |
+| Tap "Details" | Fetches transcript summary (does NOT resolve the approval) — see below |
 | Reply with text | Evaluated by LLM — see [6.4 Text Reply Evaluation](#64-text-reply-evaluation) |
 | No response within timeout | `{ approved: false, reason: "Telegram approval timed out" }` |
 | Message send fails | `{ approved: false, reason: "Telegram send failed: <error>" }` |
@@ -169,6 +173,37 @@ Timeout is implemented via `Promise.race([approvalPromise, timeoutPromise])`.
 Callback handlers are registered using Telegraf's action system:
 - `/^approve:(.+)$/` -- matches "Approve" button callbacks
 - `/^deny:(.+)$/` -- matches "Deny" button callbacks
+- `/^details:(.+)$/` -- matches "Details" button callbacks (non-resolving)
+
+### Details Button Flow
+
+The "Details" button provides additional session context without resolving the approval:
+
+1. User taps "Details" on an approval message.
+2. `answerCbQuery()` is called to dismiss the loading indicator.
+3. The handler looks up the session's `transcriptPath` via `sessionTracker.getTranscriptPath(sessionId)`.
+4. If no transcript is available, replies with "No transcript available for this session."
+5. Reads the last 15 messages via `readTranscript()`.
+6. Generates an LLM summary via `summarizeTranscript()`.
+7. Sends the summary as a **reply** to the approval message (keeping the original message and its buttons intact).
+
+The summary message format:
+```
+📋 Session context: <label>
+
+<LLM-generated summary>
+
+Recent activity:
+  Agent: <last assistant text, truncated>
+    Tools: Edit, Bash
+  User: <last user text, truncated>
+  Agent: <text>
+    Tools: Read
+```
+
+After reading the details, the user can still tap Approve/Deny or reply with text.
+
+See [Transcript Analysis](11-transcript-analysis.md) for details on the reader and summarizer.
 
 ## 6.4 Text Reply Evaluation
 
@@ -209,22 +244,29 @@ For stop decision messages, text replies are always treated as "forward to sessi
 
 ## 6.5 Stop Decision Flow
 
-When a Claude session stops with a question, `requestStopDecision()` sends a different message:
+When a Claude session stops (for any reason — questions, errors after retries, or normal completion), `requestStopDecision()` sends an enriched message with optional transcript analysis:
 
 ```
-Agent stopped
+🛑 Agent stopped — <label>
 
-Session: <label>
+📋 Summary:
+<LLM-generated summary of session activity>
 
 Last message:
 <last 800 characters of the assistant message>
 
-Reply with text to answer the agent and force-continue.
+Recent tools: Edit(src/foo.ts), Bash(npm test), Read(package.json)
+
+Reply to send instructions. Buttons to continue or let stop.
 ```
 
 With inline buttons: **[Continue]** | **[Let stop]**
 
+The summary and recent tools lines are included when transcript analysis is available (passed via the `options` parameter). When unavailable, the message shows only the last message — graceful degradation.
+
 Resolution follows the same pattern as permission requests, with buttons mapped to approved/denied. Text replies are forwarded to the session as the agent's answer.
+
+See [Stop Handling](05-stop-handling.md) for the full stop flow and [Transcript Analysis](11-transcript-analysis.md) for details on transcript reading and summarization.
 
 ## 6.6 Session Notifications
 
@@ -271,7 +313,8 @@ This uses the `listClaudePanes()` and `sendKeys()` functions from `src/tmux.ts` 
 ## Cross-References
 
 - The approval flow is invoked by the [Escalation Handler](04-llm-evaluation.md) when the LLM is uncertain or denies.
-- The stop decision flow is invoked by the [Stop Handler](05-stop-handling.md) when a question is detected.
+- The stop decision flow is invoked by the [Stop Handler](05-stop-handling.md) for all stops (after retries).
+- The "Details" button and stop message enrichment use [Transcript Analysis](11-transcript-analysis.md).
 - Policy creation from text replies feeds into the [Policy Learning](08-policy-learning.md) system.
 - Session notifications are triggered by [Lifecycle Hooks](07-session-management.md).
 - Tmux functions are described in [Session Management](07-session-management.md).

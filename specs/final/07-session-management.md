@@ -20,6 +20,8 @@ interface SessionInfo {
   lastActivity: number;        // Date.now() timestamp
   denialCount: number;
   label: string;               // e.g., tmux window name or truncated session ID
+  paneId: string | null;       // tmux pane ID (e.g., "%73")
+  transcriptPath: string | null; // path to Claude Code's JSONL transcript file
 }
 ```
 
@@ -27,12 +29,14 @@ interface SessionInfo {
 
 ```typescript
 class SessionTracker {
-  register(sessionId: string, cwd: string): void;
+  register(sessionId: string, cwd: string, transcriptPath?: string): void;
   deregister(sessionId: string): void;
   get(sessionId: string): SessionInfo | undefined;
   getAll(): SessionInfo[];
   getLabel(sessionId: string): string;
-  ensureRegistered(sessionId: string, cwd: string): void;
+  getPaneId(sessionId: string): string | null;
+  getTranscriptPath(sessionId: string): string | null;
+  ensureRegistered(sessionId: string, cwd: string, transcriptPath?: string): void;
   updateState(sessionId: string, state: SessionState): void;
   updateToolUse(sessionId: string, toolName: string): void;
   recordDenial(sessionId: string): void;
@@ -47,6 +51,8 @@ class SessionTracker {
 ### Auto-Registration
 
 `ensureRegistered()` is called by the PreToolUse and Stop handlers on every invocation. If the session is not already tracked (e.g., after a server restart where the `SessionStart` event was missed), it automatically registers the session. This provides resilience against missed lifecycle events.
+
+When called on an already-registered session, `ensureRegistered()` stores the `transcriptPath` if one is provided and the session doesn't already have one. This ensures the transcript path is captured even if the `SessionStart` event was missed.
 
 ### State Machine
 
@@ -146,7 +152,7 @@ Three lifecycle hook handlers are created via factory functions in `src/hooks/li
 
 ```typescript
 createSessionStartHandler(sessionTracker, notifications)
-  --> register session in tracker
+  --> register session in tracker (with transcriptPath from input)
   --> send Telegram notification (if configured)
   --> return {}
 ```
@@ -175,7 +181,8 @@ All lifecycle handlers return empty objects -- they never instruct Claude Code t
 ## Cross-References
 
 - The session tracker is used by the [PreToolUse handler](03-permission-evaluation.md) for state management and label resolution.
-- The session tracker is used by the [Stop handler](05-stop-handling.md) for auto-registration.
+- The session tracker is used by the [Stop handler](05-stop-handling.md) for auto-registration and transcript path lookup.
+- The `transcriptPath` field is used by [Transcript Analysis](11-transcript-analysis.md) for on-demand session context.
 - Tmux integration is used by the [Telegram bot](06-telegram.md) for pane listing and remote control.
 - Session notifications are sent via the [Notification Manager](06-telegram.md).
 - Session state is exposed via the `GET /status` endpoint (see [Infrastructure](10-infrastructure.md)).

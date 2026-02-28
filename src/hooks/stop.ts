@@ -1,6 +1,7 @@
 import type { StopConfig } from "../config/types.js";
 import type { SessionTracker } from "../session-tracker.js";
 import type { ApprovalManager } from "../telegram/approval.js";
+import { readTranscript, extractRecentTools, summarizeTranscript } from "../transcript/index.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("stop-hook");
@@ -30,7 +31,7 @@ export function createStopHandler(
   return async (input: StopInput): Promise<StopResponse> => {
     const { session_id: sessionId, stop_hook_active: stopHookActive, last_assistant_message: lastMessage } = input;
 
-    sessionTracker.ensureRegistered(sessionId, input.cwd);
+    sessionTracker.ensureRegistered(sessionId, input.cwd, input.transcript_path);
     const label = sessionTracker.getLabel(sessionId);
 
     // Prevent infinite loops — if this stop was triggered by a previous block, let it stop
@@ -59,29 +60,50 @@ export function createStopHandler(
           reason: "The previous approach hit an error. Try a different approach to accomplish the task.",
         };
       }
-      log.info("Max retries reached, letting stop through", undefined, label);
+      log.info("Max retries reached, falling through to transcript analysis", undefined, label);
       retryCount.delete(sessionId);
-      return {};
+      // Fall through to transcript analysis + Telegram below
     }
 
-    // Heuristic: did the agent ask a question (but not finish)?
-    const looksLikeQuestion = /\?$|\bshould I\b|\bwould you like\b|\bdo you want/i.test(lastMessage.trim());
+    // All stops (after retry exhaustion, questions, normal) go through transcript analysis + Telegram
+    if (config.escalateToTelegram && approvalManager) {
+      log.info("Escalating stop to Telegram with transcript analysis", undefined, label);
 
-    if (looksLikeQuestion && config.escalateToTelegram && approvalManager) {
-      log.info("Agent stopped with a question, forwarding to Telegram", undefined, label);
+      // Attempt transcript analysis — graceful degradation on failure
+      let summary: string | undefined;
+      let recentTools: string | undefined;
+      const transcriptPath = sessionTracker.getTranscriptPath(sessionId);
 
-      // Send the actual question to Telegram and wait for a reply
-      const result = await approvalManager.requestStopDecision(sessionId, lastMessage, label, input.cwd, sessionTracker.getPaneId(sessionId));
+      if (transcriptPath) {
+        try {
+          const excerpt = readTranscript(transcriptPath, 15);
+          recentTools = extractRecentTools(excerpt) || undefined;
+          try {
+            summary = await summarizeTranscript(excerpt);
+          } catch (e) {
+            log.warn("Transcript summarization failed, continuing without summary", { error: String(e) });
+          }
+        } catch (e) {
+          log.warn("Transcript reading failed, continuing without analysis", { error: String(e) });
+        }
+      }
+
+      const result = await approvalManager.requestStopDecision(
+        sessionId,
+        lastMessage,
+        label,
+        input.cwd,
+        sessionTracker.getPaneId(sessionId),
+        { summary, recentTools },
+      );
 
       if (result.approved) {
-        // If the human replied with text, use that as the answer
         if (result.policyText) {
           return {
             decision: "block",
             reason: `The user answered your question: ${result.policyText}`,
           };
         }
-        // Simple "Continue" button press
         return {
           decision: "block",
           reason: "The user wants you to continue with the task.",
@@ -90,7 +112,7 @@ export function createStopHandler(
       return {};
     }
 
-    // Otherwise let the agent stop normally
+    // No Telegram — let the agent stop normally
     retryCount.delete(sessionId);
     return {};
   };

@@ -123,6 +123,7 @@ async function main(): Promise<void> {
       telegramBot,
       chatId,
       config.escalation.telegramTimeoutSeconds * 1000,
+      sessionTracker,
     );
     const replyEvaluator = new ReplyEvaluator(config.escalation.evaluatorModel);
     approvalManager.setReplyEvaluator(replyEvaluator);

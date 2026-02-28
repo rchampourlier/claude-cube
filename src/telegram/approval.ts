@@ -1,6 +1,8 @@
 import { Markup } from "telegraf";
 import type { TelegramBot } from "./bot.js";
 import type { ReplyEvaluator } from "./reply-evaluator.js";
+import type { SessionTracker } from "../session-tracker.js";
+import { readTranscript, formatRecentActivity, summarizeTranscript } from "../transcript/index.js";
 import { findPaneForCwd, sendKeys } from "../tmux.js";
 import { createLogger } from "../util/logger.js";
 
@@ -40,6 +42,7 @@ export class ApprovalManager {
     private bot: TelegramBot,
     private chatId: string,
     private timeoutMs: number = 300_000,
+    private sessionTracker: SessionTracker | null = null,
   ) {
     this.setupCallbackHandler();
     this.setupReplyHandler();
@@ -89,6 +92,65 @@ export class ApprovalManager {
         await ctx.editMessageText(
           `${ctx.callbackQuery.message && "text" in ctx.callbackQuery.message ? ctx.callbackQuery.message.text : ""}\n\n❌ Denied at ${timestamp}`,
         );
+      }
+    });
+
+    // Details button — fetch transcript summary without resolving the approval
+    this.bot.callbackQuery.action(/^details:(.+)$/, async (ctx) => {
+      const id = ctx.match[1];
+      const pending = this.pending.get(id);
+      if (!pending) {
+        await ctx.answerCbQuery("Request expired or already handled.");
+        return;
+      }
+
+      await ctx.answerCbQuery("Fetching details...");
+
+      // Find session context from messageContext
+      const msgCtx = pending.messageId ? this.messageContext.get(pending.messageId) : null;
+      if (!msgCtx || !this.sessionTracker) {
+        await ctx.reply("No session context available.", {
+          reply_parameters: { message_id: ctx.callbackQuery.message?.message_id ?? 0 },
+        });
+        return;
+      }
+
+      const transcriptPath = this.sessionTracker.getTranscriptPath(msgCtx.sessionId);
+      if (!transcriptPath) {
+        await ctx.reply("No transcript available for this session.", {
+          reply_parameters: { message_id: ctx.callbackQuery.message?.message_id ?? 0 },
+        });
+        return;
+      }
+
+      try {
+        const excerpt = readTranscript(transcriptPath, 15);
+        let summary: string;
+        try {
+          summary = await summarizeTranscript(excerpt);
+        } catch {
+          summary = "(Summary unavailable)";
+        }
+        const recentActivity = formatRecentActivity(excerpt);
+
+        const detailsMsg = [
+          `📋 <b>Session context:</b> <code>${escapeHtml(msgCtx.label)}</code>`,
+          ``,
+          escapeHtml(summary),
+          ``,
+          `<b>Recent activity:</b>`,
+          `<pre>${escapeHtml(recentActivity || "(no activity)")}</pre>`,
+        ].join("\n");
+
+        await ctx.reply(detailsMsg, {
+          parse_mode: "HTML",
+          reply_parameters: { message_id: ctx.callbackQuery.message?.message_id ?? 0 },
+        });
+      } catch (e) {
+        log.error("Failed to fetch session details", { error: String(e) });
+        await ctx.reply("Failed to fetch session details.", {
+          reply_parameters: { message_id: ctx.callbackQuery.message?.message_id ?? 0 },
+        });
       }
     });
   }
@@ -238,6 +300,7 @@ export class ApprovalManager {
     const keyboard = Markup.inlineKeyboard([
       Markup.button.callback("✅ Approve", `approve:${id}`),
       Markup.button.callback("❌ Deny", `deny:${id}`),
+      Markup.button.callback("🔍 Details", `details:${id}`),
     ]);
 
     const promise = new Promise<ApprovalResult>((resolve) => {
@@ -296,21 +359,43 @@ export class ApprovalManager {
     label?: string,
     cwd?: string,
     paneId?: string | null,
+    options?: { summary?: string; recentTools?: string },
   ): Promise<ApprovalResult> {
     const id = `stop_${++this.counter}_${Date.now()}`;
 
     const truncated = lastMessage.length > 800 ? lastMessage.slice(-800) : lastMessage;
     const displayName = label ?? sessionId.slice(0, 12);
-    const message = [
-      `🛑 <b>Agent stopped</b>`,
+    const messageParts = [
+      `🛑 <b>Agent stopped</b> — <code>${escapeHtml(displayName)}</code>`,
+    ];
+
+    if (options?.summary) {
+      messageParts.push(
+        ``,
+        `📋 <b>Summary:</b>`,
+        escapeHtml(options.summary),
+      );
+    }
+
+    messageParts.push(
       ``,
-      `<b>Session:</b> <code>${escapeHtml(displayName)}</code>`,
-      ``,
-      `Last message:`,
+      `<b>Last message:</b>`,
       `<pre>${escapeHtml(truncated)}</pre>`,
+    );
+
+    if (options?.recentTools) {
+      messageParts.push(
+        ``,
+        `<b>Recent tools:</b> ${escapeHtml(options.recentTools)}`,
+      );
+    }
+
+    messageParts.push(
       ``,
-      `<i>Reply with text to answer the agent and force-continue.</i>`,
-    ].join("\n");
+      `<i>Reply to send instructions. Buttons to continue or let stop.</i>`,
+    );
+
+    const message = messageParts.join("\n");
 
     const keyboard = Markup.inlineKeyboard([
       Markup.button.callback("▶️ Continue", `approve:${id}`),
