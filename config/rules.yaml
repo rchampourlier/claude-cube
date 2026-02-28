@@ -5,34 +5,6 @@ defaults:
   max_turns_per_agent: 50
 
 rules:
-  # DENY - checked first, immediate block
-  - name: "Block destructive commands"
-    action: deny
-    tool: Bash
-    match:
-      command:
-        - pattern: "rm\\s+(-[a-zA-Z]*f[a-zA-Z]*\\s+)?/"
-          type: regex
-    reason: "Destructive filesystem command blocked"
-
-  - name: "Block force push"
-    action: deny
-    tool: Bash
-    match:
-      command:
-        - pattern: "git\\s+push\\s+.*--force"
-          type: regex
-    reason: "Force push blocked"
-
-  - name: "Block sensitive file edits"
-    action: deny
-    tool: "Write|Edit"
-    match:
-      file_path:
-        - pattern: "\\.(env|pem)$|credentials|secrets?"
-          type: regex
-    reason: "Sensitive file modification blocked"
-
   # ALLOW - auto-approve without prompting
   - name: "Allow read-only tools"
     action: allow
