@@ -110,7 +110,7 @@ import { RuleEngine } from "./engine";           // wrong — will fail at runti
 
 ### Policies (human feedback)
 
-Policies are free-text instructions created from Telegram text replies, stored in `config/policies.yaml`, and fed to the LLM evaluator as context. They are distinct from **safety rules** (`config/rules.yaml`) which are deterministic regexp/glob/literal checks. See `src/policies/` and [08-policy-learning.md](specs/final/08-policy-learning.md).
+Policies are free-text instructions created from Telegram text replies, stored in `config/policies.yaml`, and fed to the LLM evaluator as context. They are distinct from **safety rules** (`config/rules.yaml`) which are deterministic regexp/glob/literal checks. See `src/policies/` and [08-policy-learning.md](specs/08-policy-learning.md).
 
 ### Telegram approval
 

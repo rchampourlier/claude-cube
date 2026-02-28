@@ -50,4 +50,4 @@ This document maps each exploration specification to its location(s) in the fina
 
 ## Observations Document
 
-The [exploration/notes.md](../exploration/notes.md) findings are incorporated throughout the final specs as inline notes (e.g., "NOT ENFORCED", "vestigial", "never called"). The notes document remains the canonical reference for all observations.
+The [exploration/notes.md](exploration/notes.md) findings are incorporated throughout the final specs as inline notes (e.g., "NOT ENFORCED", "vestigial", "never called"). The notes document remains the canonical reference for all observations.

@@ -161,7 +161,7 @@ This creates a policy scoped to the `Bash` tool. Next time a similar `npm instal
 - **Create**: Reply with text to any Telegram approval request
 - **View**: Open `config/policies.yaml` (YAML file, created at runtime)
 - **Delete**: Edit `config/policies.yaml` directly (remove entries)
-- **Promote to rule**: When a policy is stable, convert it to a hard rule in `config/rules.yaml` for instant, deterministic evaluation. See [Policy-to-Rule Promotion](specs/final/08-policy-learning.md#85-policy-to-rule-promotion).
+- **Promote to rule**: When a policy is stable, convert it to a hard rule in `config/rules.yaml` for instant, deterministic evaluation. See [Policy-to-Rule Promotion](specs/08-policy-learning.md#85-policy-to-rule-promotion).
 
 #### Adding rules from Telegram
 

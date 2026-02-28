@@ -83,5 +83,5 @@ On startup:
 ## Supplementary Documents
 
 - [MAPPING.md](MAPPING.md) -- Maps exploration specs to final spec sections
-- [../exploration/notes.md](../exploration/notes.md) -- Raw observations, inconsistencies, and technical debt
-- [../exploration/REVIEW.md](../exploration/REVIEW.md) -- Consistency review findings
+- [exploration/notes.md](exploration/notes.md) -- Raw observations, inconsistencies, and technical debt
+- [exploration/REVIEW.md](exploration/REVIEW.md) -- Consistency review findings
