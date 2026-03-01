@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { PolicyStore } from "../policies/store.js";
+import type { CostTracker } from "../costs/tracker.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("llm-evaluator");
@@ -39,6 +40,7 @@ export class LlmEvaluator {
     private model: string,
     private confidenceThreshold: number,
     private policyStore: PolicyStore | null = null,
+    private costTracker: CostTracker | null = null,
   ) {
     this.client = new Anthropic();
   }
@@ -71,6 +73,8 @@ export class LlmEvaluator {
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userMessage }],
       });
+
+      this.costTracker?.record(this.model, "tool-eval", response.usage);
 
       const text =
         response.content[0]?.type === "text" ? response.content[0].text : "";

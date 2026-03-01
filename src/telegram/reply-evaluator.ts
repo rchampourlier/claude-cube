@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { CostTracker } from "../costs/tracker.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("reply-evaluator");
@@ -36,7 +37,10 @@ Respond with JSON only:
 export class ReplyEvaluator {
   private client: Anthropic;
 
-  constructor(private model: string = "claude-haiku-4-5-20251001") {
+  constructor(
+    private model: string = "claude-haiku-4-5-20251001",
+    private costTracker: CostTracker | null = null,
+  ) {
     this.client = new Anthropic();
   }
 
@@ -60,6 +64,8 @@ export class ReplyEvaluator {
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userMessage }],
       });
+
+      this.costTracker?.record(this.model, "reply-eval", response.usage);
 
       const text =
         response.content[0]?.type === "text" ? response.content[0].text : "";

@@ -1,6 +1,7 @@
 import { LlmEvaluator } from "./llm-evaluator.js";
 import type { ApprovalManager, ApprovalResult } from "../telegram/approval.js";
 import type { PolicyStore } from "../policies/store.js";
+import type { CostTracker } from "../costs/tracker.js";
 import type { EscalationConfig } from "../config/types.js";
 import { createLogger } from "../util/logger.js";
 
@@ -19,11 +20,13 @@ export class EscalationHandler {
     private config: EscalationConfig,
     private approvalManager: ApprovalManager | null,
     private policyStore: PolicyStore | null = null,
+    costTracker: CostTracker | null = null,
   ) {
     this.evaluator = new LlmEvaluator(
       config.evaluatorModel,
       config.confidenceThreshold,
       policyStore,
+      costTracker,
     );
   }
 

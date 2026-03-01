@@ -14,6 +14,7 @@ This document maps each exploration specification to its location(s) in the fina
 | `src/rule-engine/engine.ts` | `exploration/rule-engine/engine.md` | [2.4 Rule Evaluation Engine](02-safety-rules.md#24-rule-evaluation-engine) |
 | `src/policies/types.ts` | `exploration/policies/types.md` | [8.1 Policy Schema and Storage](08-policy-learning.md#81-policy-schema-and-storage) |
 | `src/policies/store.ts` | `exploration/policies/store.md` | [8.1 Policy Schema and Storage](08-policy-learning.md#81-policy-schema-and-storage) |
+| `src/costs/tracker.ts` | — | [4.5 Cost Tracking](04-llm-evaluation.md#45-cost-tracking) |
 | `src/escalation/llm-evaluator.ts` | `exploration/escalation/llm-evaluator.md` | [4.1 LLM Evaluator](04-llm-evaluation.md#41-llm-evaluator) |
 | `src/escalation/handler.ts` | `exploration/escalation/handler.md` | [4.2 Escalation Handler](04-llm-evaluation.md#42-escalation-handler) |
 | `src/hooks/pre-tool-use.ts` | `exploration/hooks/pre-tool-use.md` | [3.1 PreToolUse Handler](03-permission-evaluation.md#31-pretooluse-handler) |

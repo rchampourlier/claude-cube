@@ -8,6 +8,7 @@ import { loadOrchestratorConfig } from "./config/loader.js";
 import { loadRules } from "./rule-engine/index.js";
 import { RuleEngine } from "./rule-engine/engine.js";
 import { EscalationHandler } from "./escalation/handler.js";
+import { CostTracker } from "./costs/tracker.js";
 import { AuditLog } from "./hooks/audit-hook.js";
 import { createPreToolUseHandler } from "./hooks/pre-tool-use.js";
 import { createStopHandler } from "./hooks/stop.js";
@@ -104,7 +105,9 @@ async function main(): Promise<void> {
   const port = values.port ? parseInt(values.port, 10) : config.server.port;
 
   let ruleEngine = new RuleEngine(rulesConfig);
-  const auditLog = new AuditLog(join(process.cwd(), ".claudecube", "audit"));
+  const auditDir = join(process.cwd(), ".claudecube", "audit");
+  const auditLog = new AuditLog(auditDir);
+  const costTracker = new CostTracker(auditDir);
   const policyStore = new PolicyStore(resolve("config/policies.yaml"));
   const sessionTracker = new SessionTracker();
 
@@ -118,6 +121,7 @@ async function main(): Promise<void> {
   if (config.telegram.enabled && botToken && chatId) {
     telegramBot = new TelegramBot(botToken, chatId, {
       sessionTracker,
+      costTracker,
     });
     approvalManager = new ApprovalManager(
       telegramBot,
@@ -125,7 +129,7 @@ async function main(): Promise<void> {
       config.escalation.telegramTimeoutSeconds * 1000,
       sessionTracker,
     );
-    const replyEvaluator = new ReplyEvaluator(config.escalation.evaluatorModel);
+    const replyEvaluator = new ReplyEvaluator(config.escalation.evaluatorModel, costTracker);
     approvalManager.setReplyEvaluator(replyEvaluator);
     notifications = new NotificationManager(telegramBot, sessionTracker, config.telegram);
     log.info("Telegram bot configured");
@@ -133,7 +137,7 @@ async function main(): Promise<void> {
     log.warn("Telegram not configured (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID)");
   }
 
-  const escalationHandler = new EscalationHandler(config.escalation, approvalManager, policyStore);
+  const escalationHandler = new EscalationHandler(config.escalation, approvalManager, policyStore, costTracker);
 
   // Watch rules file for hot-reload
   let rulesReloadTimer: ReturnType<typeof setTimeout> | null = null;

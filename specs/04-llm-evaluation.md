@@ -4,7 +4,7 @@ When the rule engine escalates a tool call, the escalation pipeline takes over. 
 
 ## 4.1 LLM Evaluator
 
-The `LlmEvaluator` class (`src/escalation/llm-evaluator.ts`) uses the Anthropic API to assess whether an escalated tool call should be allowed or denied.
+The `LlmEvaluator` class (`src/escalation/llm-evaluator.ts`) uses the Anthropic API to assess whether an escalated tool call should be allowed or denied. It accepts an optional `CostTracker` and records token usage after each API call.
 
 ### Interface
 
@@ -16,7 +16,8 @@ interface LlmEvaluationResult {
 }
 
 class LlmEvaluator {
-  constructor(model: string, confidenceThreshold: number, policyStore: PolicyStore | null = null);
+  constructor(model: string, confidenceThreshold: number, policyStore: PolicyStore | null = null,
+              costTracker: CostTracker | null = null);
   async evaluate(toolName: string, toolInput: Record<string, unknown>,
                  rulesContext: string, escalationReason: string): Promise<LlmEvaluationResult>;
 }
@@ -75,7 +76,7 @@ The `confidenceThreshold` parameter is accepted by the constructor but is **not 
 
 ## 4.2 Escalation Handler
 
-The `EscalationHandler` class (`src/escalation/handler.ts`) orchestrates the two-tier pipeline.
+The `EscalationHandler` class (`src/escalation/handler.ts`) orchestrates the two-tier pipeline. It accepts an optional `CostTracker` and passes it through to `LlmEvaluator`.
 
 ### Interface
 
@@ -88,7 +89,8 @@ interface EscalationDecision {
 
 class EscalationHandler {
   constructor(config: EscalationConfig, approvalManager: ApprovalManager | null,
-              policyStore: PolicyStore | null = null);
+              policyStore: PolicyStore | null = null,
+              costTracker: CostTracker | null = null);
   async evaluate(toolName: string, toolInput: Record<string, unknown>,
                  context: { agentId: string; label?: string; rulesContext: string;
                            escalationReason: string }): Promise<EscalationDecision>;
@@ -173,6 +175,48 @@ escalation:
 ```
 
 See [Configuration](09-configuration.md) for the full schema.
+
+## 4.5 Cost Tracking
+
+The `CostTracker` class (`src/costs/tracker.ts`) records token usage after every LLM call made by ClaudeCube (both tool evaluation and reply evaluation).
+
+### Storage
+
+Cost entries are stored as JSONL in `.claudecube/audit/costs-YYYY-MM-DD.jsonl` (same directory as audit logs, daily rotation).
+
+### Entry Format
+
+```typescript
+interface CostEntry {
+  timestamp: string;
+  model: string;
+  purpose: string;       // "tool-eval" or "reply-eval"
+  inputTokens: number;
+  outputTokens: number;
+  costCents: number;
+}
+```
+
+### Pricing
+
+A static pricing map converts token counts to cost in cents:
+
+| Model | Input (per 1M tokens) | Output (per 1M tokens) |
+|---|---|---|
+| `claude-haiku-4-5-20251001` | $1.00 (100¢) | $5.00 (500¢) |
+
+Unknown models fall back to Haiku pricing with a warning.
+
+### API
+
+- `record(model, purpose, usage)` — calculates cost from the pricing map and appends a JSONL line.
+- `getTotals()` — reads JSONL files for the current month, returns `{ today: { calls, costCents }, month: { calls, costCents } }`.
+
+### Integration
+
+- `LlmEvaluator` calls `costTracker.record(model, "tool-eval", response.usage)` after each API call.
+- `ReplyEvaluator` calls `costTracker.record(model, "reply-eval", response.usage)` after each API call.
+- The Telegram `/cost` command reads from `CostTracker.getTotals()` (no admin API key needed).
 
 ## Cross-References
 

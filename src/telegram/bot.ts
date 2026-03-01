@@ -1,12 +1,22 @@
 import { Telegraf } from "telegraf";
 import type { SessionTracker } from "../session-tracker.js";
+import type { CostTracker } from "../costs/tracker.js";
 import { listClaudePanes, sendKeys } from "../tmux.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("telegram-bot");
 
+const COMMANDS = [
+  { command: "start", description: "Verify bot connection and show chat ID" },
+  { command: "status", description: "List all active Claude sessions" },
+  { command: "send", description: "Send text to a tmux pane", usage: "/send <window> <text>" },
+  { command: "cost", description: "Show ClaudeCube's own LLM costs (today + month)" },
+  { command: "help", description: "Show this help message" },
+];
+
 export interface TelegramBotDeps {
   sessionTracker: SessionTracker;
+  costTracker?: CostTracker;
   onFreeText?: (chatId: number, text: string) => void;
 }
 
@@ -61,18 +71,6 @@ export class TelegramBot {
       ctx.reply(lines.join("\n\n"), { parse_mode: "HTML" });
     });
 
-    this.bot.command("panes", (ctx) => {
-      const panes = listClaudePanes();
-      if (panes.length === 0) {
-        ctx.reply("No Claude panes found in tmux.");
-        return;
-      }
-      const lines = panes.map(
-        (p) => `${escapeHtml(p.windowName)} — <code>${escapeHtml(p.paneId)}</code>`,
-      );
-      ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
-    });
-
     this.bot.command("send", (ctx) => {
       const args = ctx.message.text.split(/\s+/).slice(1);
       const windowTarget = args[0];
@@ -110,6 +108,31 @@ export class TelegramBot {
       } catch (e) {
         ctx.reply(`Failed: ${e}`);
       }
+    });
+
+    this.bot.command("cost", (ctx) => {
+      const tracker = this.deps.costTracker;
+      if (!tracker) {
+        ctx.reply("Cost tracking is not configured.");
+        return;
+      }
+      const totals = tracker.getTotals();
+      const fmtCents = (c: number) => `$${(c / 100).toFixed(4)}`;
+      ctx.reply(
+        `<b>Today:</b> ${fmtCents(totals.today.costCents)} (${totals.today.calls} calls)\n` +
+          `<b>Month to date:</b> ${fmtCents(totals.month.costCents)} (${totals.month.calls} calls)`,
+        { parse_mode: "HTML" },
+      );
+    });
+
+    this.bot.command("help", (ctx) => {
+      const lines = COMMANDS.map((c) => {
+        const usage = c.usage ?? `/${c.command}`;
+        return `<b>${escapeHtml(usage)}</b> — ${escapeHtml(c.description)}`;
+      });
+      lines.push("");
+      lines.push("Any other text is forwarded to the first Claude pane.");
+      ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
     });
 
     // Free-text messages — inject into first Claude pane

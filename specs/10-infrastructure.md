@@ -138,7 +138,7 @@ The CLI entry point (`src/index.ts`) handles argument parsing and application in
 ### Server Bootstrap Sequence
 
 1. Load orchestrator config and rules.
-2. Create core components: `RuleEngine`, `AuditLog`, `PolicyStore`, `SessionTracker`.
+2. Create core components: `RuleEngine`, `AuditLog`, `CostTracker`, `PolicyStore`, `SessionTracker`.
 3. Conditional Telegram setup: if enabled and tokens are present, create `TelegramBot`, `ApprovalManager`, `NotificationManager`. Otherwise all three are `null`.
 4. Create `EscalationHandler` (receives potentially-null `ApprovalManager`).
 5. Create all five hook handlers via factory functions.

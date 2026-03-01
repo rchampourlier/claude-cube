@@ -20,6 +20,7 @@ class TelegramBot {
 
 interface TelegramBotDeps {
   sessionTracker: SessionTracker;
+  costTracker?: CostTracker;
   onFreeText?: (chatId: number, text: string) => void;
 }
 ```
@@ -39,20 +40,9 @@ All incoming messages are filtered through a middleware that checks `ctx.chat.id
 |---|---|---|
 | `/start` | Returns the chat ID | Used for initial setup verification |
 | `/status` | Lists all active sessions | Queries `SessionTracker.getAll()`, formats with state, denial count, CWD, last tool, age |
-| `/panes` | Lists Claude panes in tmux | Calls `listClaudePanes()`, displays window name and pane ID |
 | `/send <window-name> <text>` | Sends text to a Claude session by tmux window name | Resolves window name to pane ID, then calls `sendKeys()` |
-
-### /panes Display Format
-
-The `/panes` command displays Claude sessions grouped by tmux window name for human readability:
-
-```
-claude3-specs — %1
-refactor-auth — %28
-api-client — %13
-```
-
-Format: `<window-name> — <pane-id>`. The window name is the primary identifier the user sees and uses with `/send`.
+| `/cost` | Shows ClaudeCube's own LLM costs (today + month) | Reads from local `CostTracker.getTotals()` (no admin API key needed) |
+| `/help` | Lists all available commands | Iterates the `COMMANDS` registry in `bot.ts` |
 
 ### /send by Window Name
 
@@ -303,7 +293,6 @@ The `denialAlert()` method is fully implemented but **never called** from any ho
 
 The Telegram bot provides remote control of tmux-based Claude sessions:
 
-- `/panes` lists all tmux panes running `claude` with human-readable window names
 - `/send <window-name> <text>` sends text to a specific session by window name
 - Free text messages are forwarded to the first Claude pane
 - Replies to approval/stop messages are routed to the correct pane via message-to-session mapping
