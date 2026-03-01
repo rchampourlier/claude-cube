@@ -91,6 +91,10 @@ index.ts (CLI + server startup)
 | `src/config/` | `types.ts`, `loader.ts` | Zod schemas for `orchestrator.yaml`. |
 | `hooks/claudecube-hook.sh` | — | Shell script called by Claude Code hooks; curls ClaudeCube server. |
 
+## Specs-first workflow
+
+Before implementing changes, review the relevant specs in `specs/` and update them to reflect the planned changes. Specs should be updated **before** writing code so that they serve as the source of truth for the implementation. After implementation, verify that specs still accurately describe the new behavior.
+
 ## Conventions
 
 ### Imports
@@ -111,6 +115,10 @@ import { RuleEngine } from "./engine";           // wrong — will fail at runti
 ### Policies (human feedback)
 
 Policies are free-text instructions created from Telegram text replies, stored in `config/policies.yaml`, and fed to the LLM evaluator as context. They are distinct from **safety rules** (`config/rules.yaml`) which are deterministic regexp/glob/literal checks. See `src/policies/` and [08-policy-learning.md](specs/08-policy-learning.md).
+
+### Telegram commands
+
+When adding a new Telegram bot command, add an entry to the `COMMANDS` constant at the top of `src/telegram/bot.ts` so that `/help` stays up to date.
 
 ### Telegram approval
 

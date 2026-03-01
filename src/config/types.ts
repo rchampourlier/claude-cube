@@ -7,7 +7,7 @@ export const ServerConfigSchema = z.object({
 export const EscalationConfigSchema = z.object({
   evaluatorModel: z.string().default("claude-haiku-4-5-20251001"),
   confidenceThreshold: z.number().min(0).max(1).default(0.8),
-  telegramTimeoutSeconds: z.number().positive().default(300),
+  telegramTimeoutSeconds: z.number().nonnegative().default(300),
 });
 
 export const TelegramConfigSchema = z.object({

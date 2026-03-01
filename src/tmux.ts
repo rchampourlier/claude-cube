@@ -56,7 +56,12 @@ export function findPaneForCwd(cwd: string): string | null {
 
 export function sendKeys(paneTarget: string, text: string): void {
   try {
-    execSync(`tmux send-keys -t ${JSON.stringify(paneTarget)} ${JSON.stringify(text)} Enter`, {
+    // Use -l for literal text (no key name interpretation), then send Enter separately
+    execSync(`tmux send-keys -t ${JSON.stringify(paneTarget)} -l ${JSON.stringify(text)}`, {
+      encoding: "utf-8",
+      timeout: 5000,
+    });
+    execSync(`tmux send-keys -t ${JSON.stringify(paneTarget)} Enter`, {
       encoding: "utf-8",
       timeout: 5000,
     });

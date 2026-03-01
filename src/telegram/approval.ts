@@ -335,6 +335,11 @@ export class ApprovalManager {
       return { approved: false, reason: `Telegram send failed: ${e}` };
     }
 
+    // If timeout is 0, wait indefinitely for human response
+    if (this.timeoutMs === 0) {
+      return promise;
+    }
+
     // Timeout handling
     const timeout = new Promise<ApprovalResult>((resolve) => {
       setTimeout(() => {
@@ -431,6 +436,10 @@ export class ApprovalManager {
       log.error("Failed to send stop decision request", { error: String(e) });
       this.cleanup(id);
       return { approved: false, reason: `Telegram send failed: ${e}` };
+    }
+
+    if (this.timeoutMs === 0) {
+      return promise;
     }
 
     const timeout = new Promise<ApprovalResult>((resolve) => {

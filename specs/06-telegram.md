@@ -299,6 +299,8 @@ The Telegram bot provides remote control of tmux-based Claude sessions:
 
 This uses the `listClaudePanes()` and `sendKeys()` functions from `src/tmux.ts` (see [Session Management](07-session-management.md)).
 
+`sendKeys()` uses the `-l` flag to send text literally (preventing tmux from interpreting key names within the text), then sends `Enter` as a separate call to ensure the input is submitted.
+
 ## Cross-References
 
 - The approval flow is invoked by the [Escalation Handler](04-llm-evaluation.md) when the LLM is uncertain or denies.

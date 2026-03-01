@@ -151,6 +151,18 @@ export class SessionTracker {
       session.lastToolName = toolName;
       session.lastActivity = Date.now();
       session.state = "active";
+      this.refreshLabel(sessionId);
+    }
+  }
+
+  /** Re-resolve the session label from tmux (picks up window renames). */
+  refreshLabel(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    const tmuxLabel = resolveLabel(session.cwd);
+    if (tmuxLabel && tmuxLabel !== session.label) {
+      log.info("Session label refreshed", { sessionId, oldLabel: session.label, newLabel: tmuxLabel });
+      session.label = tmuxLabel;
     }
   }
 

@@ -171,8 +171,10 @@ The escalation pipeline is configured via `config/orchestrator.yaml`:
 escalation:
   evaluatorModel: "claude-haiku-4-5-20251001"   # Anthropic model ID
   confidenceThreshold: 0.8                       # NOT USED (vestigial)
-  telegramTimeoutSeconds: 300                    # Telegram approval timeout
+  telegramTimeoutSeconds: 300                    # Telegram approval timeout (0 = disabled)
 ```
+
+Setting `telegramTimeoutSeconds: 0` disables the timeout entirely — approval requests will wait indefinitely for a human response instead of auto-denying after the timeout period.
 
 See [Configuration](09-configuration.md) for the full schema.
 
