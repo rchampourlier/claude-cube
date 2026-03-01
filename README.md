@@ -183,6 +183,8 @@ Once the bot is running, you can control sessions from your phone:
 | `/status` | List all active sessions with state, denials, and cwd |
 | `/panes` | List Claude panes in tmux |
 | `/send <pane-id> <text>` | Send text to a specific tmux pane |
+| `/cost` | Show Anthropic API costs (today + month-to-date) |
+| `/help` | List all available commands |
 | Free text | Forwarded to the first Claude pane via tmux |
 
 ## Configuration
@@ -229,6 +231,7 @@ src/
     audit-hook.ts           # Structured JSONL audit logging
   telegram/
     bot.ts                  # Telegraf bot + session commands + tmux integration
+    cost-api.ts             # Anthropic Admin API client for /cost command
     approval.ts             # Inline keyboard approval flow
     notifications.ts        # Session start/end notifications and alerts
   escalation/
