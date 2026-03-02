@@ -50,6 +50,7 @@ export class EscalationHandler {
       toolInput,
       context.rulesContext,
       context.escalationReason,
+      { cwd: context.cwd, label: context.label },
     );
 
     if (llmResult.confident && llmResult.allowed) {

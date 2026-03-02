@@ -19,7 +19,8 @@ class LlmEvaluator {
   constructor(model: string, confidenceThreshold: number, policyStore: PolicyStore | null = null,
               costTracker: CostTracker | null = null);
   async evaluate(toolName: string, toolInput: Record<string, unknown>,
-                 rulesContext: string, escalationReason: string): Promise<LlmEvaluationResult>;
+                 rulesContext: string, escalationReason: string,
+                 context?: { cwd?: string; label?: string }): Promise<LlmEvaluationResult>;
 }
 ```
 
@@ -30,6 +31,7 @@ The LLM receives a system prompt establishing it as a security evaluator:
 > You are a security evaluator for an automated coding agent. You evaluate whether a tool call should be allowed or denied based on safety rules and human-defined policies.
 
 Key instructions in the prompt:
+- The LLM receives session context (working directory, session label) to make context-aware decisions
 - Respond with JSON: `{ "allowed": boolean, "confident": boolean, "reason": string }`
 - Read-only operations are generally safe
 - File edits within `src/` are generally safe
@@ -40,6 +42,10 @@ Key instructions in the prompt:
 ### User Message Format
 
 ```
+Session context:
+- Working directory: /path/to/project
+- Session: my-label
+
 Tool: <toolName>
 Input: <JSON-formatted toolInput>
 
@@ -52,6 +58,8 @@ Human-defined policies:
 - [pol_0] <policy description>
 - [pol_1] <policy description>
 ```
+
+The session context block is included when cwd or label are available. It provides the LLM with awareness of which project the Claude session is running in.
 
 ### Response Parsing
 
@@ -92,7 +100,8 @@ class EscalationHandler {
               policyStore: PolicyStore | null = null,
               costTracker: CostTracker | null = null);
   async evaluate(toolName: string, toolInput: Record<string, unknown>,
-                 context: { agentId: string; label?: string; rulesContext: string;
+                 context: { agentId: string; cwd?: string; paneId?: string | null;
+                           label?: string; rulesContext: string;
                            escalationReason: string }): Promise<EscalationDecision>;
 }
 ```

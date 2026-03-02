@@ -14,6 +14,7 @@ export interface LlmEvaluationResult {
 const SYSTEM_PROMPT = `You are a security evaluator for an automated coding agent. You evaluate whether a tool call should be allowed or denied based on safety rules and human-defined policies.
 
 You will receive:
+- Session context (working directory, session label)
 - The tool name and its input
 - The safety rules context
 - The reason this was escalated
@@ -50,10 +51,16 @@ export class LlmEvaluator {
     toolInput: Record<string, unknown>,
     rulesContext: string,
     escalationReason: string,
+    context?: { cwd?: string; label?: string },
   ): Promise<LlmEvaluationResult> {
     const policiesContext = this.policyStore?.formatForLlm(toolName) ?? "";
 
+    const sessionLines: string[] = [];
+    if (context?.cwd) sessionLines.push(`- Working directory: ${context.cwd}`);
+    if (context?.label) sessionLines.push(`- Session: ${context.label}`);
+
     const userMessage = [
+      ...(sessionLines.length ? [`Session context:`, ...sessionLines, ``] : []),
       `Tool: ${toolName}`,
       `Input: ${JSON.stringify(toolInput, null, 2)}`,
       ``,
