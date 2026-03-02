@@ -148,7 +148,7 @@ This creates a policy scoped to the `Bash` tool. Next time a similar `npm instal
 
 #### Policies vs rules
 
-| | Rules (`config/rules.yaml`) | Policies (`config/policies.yaml`) |
+| | Rules (`config/rules.yaml`) | Policies (`config/policies.yaml` + `policies.local.yaml`) |
 |---|---|---|
 | **Type** | Deterministic (regexp/glob/literal) | Advisory (free-text for LLM) |
 | **Speed** | Instant — no API call | Requires LLM evaluation |
@@ -158,9 +158,10 @@ This creates a policy scoped to the `Bash` tool. Next time a similar `npm instal
 
 #### Managing policies
 
-- **Create**: Reply with text to any Telegram approval request
-- **View**: Open `config/policies.yaml` (YAML file, created at runtime)
-- **Delete**: Edit `config/policies.yaml` directly (remove entries)
+- **Create**: Reply with text to any Telegram approval request (saved to `config/policies.local.yaml`)
+- **View**: Open `config/policies.yaml` (shared) and `config/policies.local.yaml` (local, gitignored)
+- **Delete**: Edit the relevant policies file directly (remove entries)
+- **Consolidate**: Run `/consolidate-policies` in Claude Code to analyze and merge redundant policies
 - **Promote to rule**: When a policy is stable, convert it to a hard rule in `config/rules.yaml` for instant, deterministic evaluation. See [Policy-to-Rule Promotion](specs/08-policy-learning.md#85-policy-to-rule-promotion).
 
 #### Adding rules from Telegram
@@ -246,6 +247,7 @@ hooks/
   claudecube-hook.sh        # Shell script called by Claude Code hooks
 config/
   rules.yaml                # Safety rules (edit this)
-  policies.yaml             # Policies from human feedback (created at runtime)
+  policies.yaml             # Shared policies (committed)
+  policies.local.yaml       # Local policies from Telegram (gitignored)
   orchestrator.yaml         # Server + escalation settings (edit this)
 ```

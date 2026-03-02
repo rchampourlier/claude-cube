@@ -114,7 +114,14 @@ import { RuleEngine } from "./engine";           // wrong — will fail at runti
 
 ### Policies (human feedback)
 
-Policies are free-text instructions created from Telegram text replies, stored in `config/policies.yaml`, and fed to the LLM evaluator as context. They are distinct from **safety rules** (`config/rules.yaml`) which are deterministic regexp/glob/literal checks. See `src/policies/` and [08-policy-learning.md](specs/08-policy-learning.md).
+Policies are free-text instructions created from Telegram text replies, fed to the LLM evaluator as context. They are distinct from **safety rules** (`config/rules.yaml`) which are deterministic regexp/glob/literal checks. See `src/policies/` and [08-policy-learning.md](specs/08-policy-learning.md).
+
+- **Shared**: `config/policies.yaml` — committed to git, shared across machines
+- **Local**: `config/policies.local.yaml` — gitignored, machine-specific, grows via Telegram approvals
+
+Both files are loaded by `PolicyStore` and merged at runtime. New policies from Telegram are always saved to the local file.
+
+Policy descriptions follow a consistent style: imperative verb-first, no filler phrases. Repo-scoped policies use the suffix `Authorized repos: repo1, repo2` so the repo list is easy to scan and extend. Use `/consolidate-policies` to analyze and merge redundant policies.
 
 ### Telegram commands
 
@@ -133,6 +140,8 @@ When adding a new Telegram bot command, add an entry to the `COMMANDS` constant 
 ## Config files
 
 - `config/rules.yaml` — safety rules. Schema: `src/rule-engine/types.ts` (`RulesConfigSchema`).
+- `config/policies.yaml` — shared policies (committed). Schema: `src/policies/types.ts`.
+- `config/policies.local.yaml` — local policies (gitignored). Same schema, grows via Telegram.
 - `config/orchestrator.yaml` — server port, escalation, Telegram, stop handler settings. Schema: `src/config/types.ts` (`OrchestratorConfigSchema`).
 
 When adding new config fields, add them to the Zod schema first with a `.default()` value to keep backward compatibility.
