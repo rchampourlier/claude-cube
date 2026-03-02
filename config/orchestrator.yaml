@@ -10,8 +10,8 @@ escalation:
 telegram:
   # Set via env: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
   enabled: true
-  notifyOnStart: true
-  notifyOnComplete: true
+  notifyOnStart: false
+  notifyOnComplete: false
   notifyOnError: true
   denialAlertThreshold: 5
 
