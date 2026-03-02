@@ -60,7 +60,7 @@ An empty object `{}` means "let the session stop normally."
    |     --> requestStopDecision(sessionId, lastMessage, label, cwd, paneId,
    |                             { summary, recentTools })
    |     |-- approved with text --> return { decision: "block",
-   |     |                                   reason: "User answered: <text>" }
+   |     |                                   reason: "<user's text>" }
    |     |-- approved (button) ---> return { decision: "block",
    |     |                                   reason: "User wants you to continue" }
    |     |-- denied/timeout ------> return {} (let stop)

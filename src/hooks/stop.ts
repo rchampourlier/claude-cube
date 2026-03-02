@@ -101,7 +101,7 @@ export function createStopHandler(
         if (result.policyText) {
           return {
             decision: "block",
-            reason: `The user answered your question: ${result.policyText}`,
+            reason: result.policyText,
           };
         }
         return {
