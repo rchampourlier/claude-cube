@@ -6,39 +6,52 @@ import { createLogger } from "../util/logger.js";
 
 const log = createLogger("policy-store");
 
+function loadPoliciesFromFile(filePath: string): Policy[] {
+  try {
+    const raw = readFileSync(filePath, "utf-8");
+    const parsed = parseYaml(raw);
+    const file = PoliciesFileSchema.parse(parsed);
+    log.info("Loaded policies", { path: filePath, count: file.policies.length });
+    return file.policies;
+  } catch {
+    log.info("No policies file found, skipping", { filePath });
+    return [];
+  }
+}
+
 export class PolicyStore {
   private policies: Policy[] = [];
   private counter = 0;
 
-  constructor(private filePath: string) {
+  constructor(
+    private sharedPath: string,
+    private localPath: string,
+  ) {
     this.load();
   }
 
   private load(): void {
-    try {
-      const raw = readFileSync(this.filePath, "utf-8");
-      const parsed = parseYaml(raw);
-      const file = PoliciesFileSchema.parse(parsed);
-      this.policies = file.policies;
-      // Set counter past existing IDs
-      for (const p of this.policies) {
-        const num = parseInt(p.id.replace("pol_", ""), 10);
-        if (!isNaN(num) && num >= this.counter) {
-          this.counter = num + 1;
-        }
+    const shared = loadPoliciesFromFile(this.sharedPath);
+    const local = loadPoliciesFromFile(this.localPath);
+    this.policies = [...shared, ...local];
+
+    // Set counter past existing IDs
+    for (const p of this.policies) {
+      const num = parseInt(p.id.replace("pol_", ""), 10);
+      if (!isNaN(num) && num >= this.counter) {
+        this.counter = num + 1;
       }
-      log.info("Loaded policies", { count: this.policies.length });
-    } catch {
-      this.policies = [];
-      log.info("No existing policies file, starting fresh", { filePath: this.filePath });
     }
   }
 
   private save(): void {
     try {
-      mkdirSync(dirname(this.filePath), { recursive: true });
-      writeFileSync(this.filePath, stringifyYaml({ policies: this.policies }));
-      log.info("Saved policies", { count: this.policies.length });
+      mkdirSync(dirname(this.localPath), { recursive: true });
+      // Only save local policies (exclude shared ones)
+      const sharedIds = new Set(loadPoliciesFromFile(this.sharedPath).map((p) => p.id));
+      const localPolicies = this.policies.filter((p) => !sharedIds.has(p.id));
+      writeFileSync(this.localPath, stringifyYaml({ policies: localPolicies }));
+      log.info("Saved local policies", { count: localPolicies.length });
     } catch (e) {
       log.error("Failed to save policies", { error: String(e) });
     }
@@ -49,7 +62,6 @@ export class PolicyStore {
       id: `pol_${this.counter++}`,
       description,
       tool,
-      createdAt: new Date().toISOString(),
     };
     this.policies.push(policy);
     this.save();

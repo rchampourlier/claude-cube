@@ -108,7 +108,7 @@ async function main(): Promise<void> {
   const auditDir = join(process.cwd(), ".claudecube", "audit");
   const auditLog = new AuditLog(auditDir);
   const costTracker = new CostTracker(auditDir);
-  const policyStore = new PolicyStore(resolve("config/policies.yaml"));
+  const policyStore = new PolicyStore(resolve("config/policies.yaml"), resolve("config/policies.local.yaml"));
   const sessionTracker = new SessionTracker();
 
   // Telegram setup

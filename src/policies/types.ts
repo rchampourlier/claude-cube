@@ -4,7 +4,6 @@ export const PolicySchema = z.object({
   id: z.string(),
   description: z.string(),
   tool: z.string().optional(),
-  createdAt: z.string(),
 });
 
 export const PoliciesFileSchema = z.object({
