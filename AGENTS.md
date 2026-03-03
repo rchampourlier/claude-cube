@@ -7,7 +7,7 @@ Guide for AI agents working on the ClaudeCube codebase.
 ```bash
 npm run build          # tsc → dist/
 npm run lint           # tsc --noEmit (type-check only)
-npm run test           # node --test (no tests yet — add *.test.ts next to source files)
+npm run test           # node --test --import tsx 'src/**/*.test.ts'
 npx tsx src/index.ts --help   # quick smoke test
 ```
 
@@ -90,6 +90,44 @@ index.ts (CLI + server startup)
 | `src/telegram/` | `bot.ts`, `approval.ts` | Bot lifecycle, inline keyboard approval, session status, tmux integration. |
 | `src/config/` | `types.ts`, `loader.ts` | Zod schemas for `orchestrator.yaml`. |
 | `hooks/claudecube-hook.sh` | — | Shell script called by Claude Code hooks; curls ClaudeCube server. |
+
+## Testing (TDD)
+
+Tests use Node's built-in test runner (`node:test`) with `tsx` for TypeScript support. Test files live next to their source files with a `.test.ts` suffix.
+
+```bash
+npm run test                    # run all tests
+node --test --import tsx src/session-tracker.test.ts  # run a single test file
+```
+
+### TDD workflow for bug fixes
+
+When fixing a regression or bug, follow this workflow:
+
+1. **Write the test first** — create a test that exercises the expected behavior. The test should fail (RED) with the current broken code.
+2. **Confirm RED** — run the test and verify it fails for the right reason (the assertion message should describe the expected behavior).
+3. **Fix the implementation** — make the minimal code change to fix the bug.
+4. **Confirm GREEN** — run the test and verify it passes.
+5. **Run all tests** — ensure the fix doesn't break anything else: `npm run test && npm run lint`.
+
+### Testability via dependency injection
+
+Modules that depend on external systems (tmux, Telegram, Anthropic API) accept injectable dependencies via constructor options. Production code uses defaults; tests inject mocks.
+
+Example — `SessionTracker` accepts tmux functions:
+```typescript
+// Production (defaults to real tmux)
+const tracker = new SessionTracker();
+
+// Test (injectable mocks)
+const tracker = new SessionTracker({
+  resolveLabel: () => null,
+  findPaneForCwd: () => null,
+  listClaudePanes: () => [],
+});
+```
+
+When adding new external dependencies to a module, expose them as injectable deps to keep the code testable.
 
 ## Specs-first workflow
 

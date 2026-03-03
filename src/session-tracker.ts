@@ -1,9 +1,21 @@
-import { resolveLabel, listClaudePanes, findPaneForCwd } from "./tmux.js";
+import { basename } from "node:path";
+import {
+  resolveLabel as tmuxResolveLabel,
+  listClaudePanes as tmuxListClaudePanes,
+  findPaneForCwd as tmuxFindPaneForCwd,
+} from "./tmux.js";
+import type { TmuxPane } from "./tmux.js";
 import { createLogger } from "./util/logger.js";
 
 const log = createLogger("session-tracker");
 
 export type SessionState = "active" | "idle" | "permission_pending";
+
+export interface SessionTrackerDeps {
+  resolveLabel: (cwd: string) => string | null;
+  findPaneForCwd: (cwd: string) => string | null;
+  listClaudePanes: () => TmuxPane[];
+}
 
 export interface SessionInfo {
   sessionId: string;
@@ -23,10 +35,19 @@ export interface SessionInfo {
 
 export class SessionTracker {
   private sessions = new Map<string, SessionInfo>();
+  private deps: SessionTrackerDeps;
+
+  constructor(deps?: Partial<SessionTrackerDeps>) {
+    this.deps = {
+      resolveLabel: deps?.resolveLabel ?? tmuxResolveLabel,
+      findPaneForCwd: deps?.findPaneForCwd ?? tmuxFindPaneForCwd,
+      listClaudePanes: deps?.listClaudePanes ?? tmuxListClaudePanes,
+    };
+  }
 
   register(sessionId: string, cwd: string, transcriptPath?: string): void {
-    const tmuxLabel = resolveLabel(cwd);
-    const label = tmuxLabel ?? sessionId.slice(0, 12);
+    const tmuxLabel = this.deps.resolveLabel(cwd);
+    const label = tmuxLabel ?? basename(cwd);
     this.sessions.set(sessionId, {
       sessionId,
       cwd,
@@ -36,7 +57,7 @@ export class SessionTracker {
       lastActivity: Date.now(),
       denialCount: 0,
       label,
-      paneId: findPaneForCwd(cwd),
+      paneId: this.deps.findPaneForCwd(cwd),
       transcriptPath: transcriptPath ?? null,
     });
     log.info("Session registered", { sessionId, label, cwd });
@@ -71,7 +92,7 @@ export class SessionTracker {
    * Called at startup so /status and /panes reflect existing sessions immediately.
    */
   registerFromTmux(): void {
-    const panes = listClaudePanes();
+    const panes = this.deps.listClaudePanes();
     for (const pane of panes) {
       const syntheticId = `tmux_${pane.paneId}`;
       if (!this.findByCwd(pane.paneCwd)) {
@@ -159,7 +180,7 @@ export class SessionTracker {
   refreshLabel(sessionId: string): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
-    const tmuxLabel = resolveLabel(session.cwd);
+    const tmuxLabel = this.deps.resolveLabel(session.cwd);
     if (tmuxLabel && tmuxLabel !== session.label) {
       log.info("Session label refreshed", { sessionId, oldLabel: session.label, newLabel: tmuxLabel });
       session.label = tmuxLabel;
