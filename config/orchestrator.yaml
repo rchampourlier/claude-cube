@@ -5,7 +5,7 @@ escalation:
   evaluatorModel: "claude-haiku-4-5-20251001"
   confidenceThreshold: 0.8
   # Telegram approval timeout in seconds. Set to 0 to disable (wait indefinitely).
-  telegramTimeoutSeconds: 300
+  telegramTimeoutSeconds: 0
 
 telegram:
   # Set via env: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
