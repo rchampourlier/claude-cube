@@ -34,7 +34,7 @@ export function createSessionStartHandler(
   return async (input: SessionStartInput): Promise<Record<string, never>> => {
     const { session_id: sessionId, cwd, transcript_path: transcriptPath, tmux_pane: tmuxPaneId } = input;
     log.info("SessionStart", { sessionId, cwd, tmuxPaneId });
-    sessionTracker.register(sessionId, cwd, transcriptPath, tmuxPaneId);
+    sessionTracker.ensureRegistered(sessionId, cwd, transcriptPath, tmuxPaneId);
     await notifications?.sessionStarted(sessionId, cwd);
     return {};
   };
