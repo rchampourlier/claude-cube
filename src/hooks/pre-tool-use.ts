@@ -2,6 +2,7 @@ import type { RuleEngine } from "../rule-engine/engine.js";
 import type { EscalationHandler } from "../escalation/handler.js";
 import type { AuditLog } from "./audit-hook.js";
 import type { SessionTracker } from "../session-tracker.js";
+import type { QuestionHandler } from "../telegram/question-handler.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("pre-tool-use");
@@ -30,6 +31,7 @@ export function createPreToolUseHandler(
   escalationHandler: EscalationHandler,
   auditLog: AuditLog,
   sessionTracker: SessionTracker,
+  questionHandler: QuestionHandler | null = null,
 ) {
   return async (input: PreToolUseInput): Promise<PreToolUseResponse> => {
     const { tool_name: toolName, tool_input: toolInput, session_id: sessionId } = input;
@@ -40,6 +42,42 @@ export function createPreToolUseHandler(
     sessionTracker.ensureRegistered(sessionId, input.cwd, input.transcript_path);
     sessionTracker.updateToolUse(sessionId, toolName);
     sessionTracker.updateState(sessionId, "permission_pending");
+
+    // Step 0: AskUserQuestion early intercept (before rule engine)
+    if (toolName === "AskUserQuestion") {
+      if (!questionHandler) {
+        // No Telegram — passthrough to let the terminal handle it
+        log.info("AskUserQuestion passthrough (no Telegram)", {}, label);
+        sessionTracker.updateState(sessionId, "active");
+        return {};
+      }
+
+      try {
+        const answer = await questionHandler.handleQuestion(toolInput, {
+          sessionId,
+          label: label ?? sessionId.slice(0, 12),
+        });
+
+        auditLog.log({
+          sessionId,
+          toolName,
+          toolInput,
+          decision: "deny",
+          reason: answer,
+          decidedBy: "telegram-question",
+        });
+
+        sessionTracker.updateState(sessionId, "active");
+        return {
+          decision: "block",
+          reason: answer,
+        };
+      } catch (e) {
+        log.error("AskUserQuestion handler failed, passing through", { error: String(e) });
+        sessionTracker.updateState(sessionId, "active");
+        return {};
+      }
+    }
 
     // Step 1: Rule engine evaluation
     const result = getRuleEngine().evaluate(toolName, toolInput);

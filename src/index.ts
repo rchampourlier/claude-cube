@@ -19,7 +19,7 @@ import {
 } from "./hooks/lifecycle.js";
 import { SessionTracker } from "./session-tracker.js";
 import { createHttpServer } from "./server.js";
-import { TelegramBot, ApprovalManager, NotificationManager, ReplyEvaluator } from "./telegram/index.js";
+import { TelegramBot, ApprovalManager, NotificationManager, ReplyEvaluator, QuestionHandler } from "./telegram/index.js";
 import { PolicyStore } from "./policies/index.js";
 import { install, uninstall } from "./installer.js";
 
@@ -114,6 +114,7 @@ async function main(): Promise<void> {
   // Telegram setup
   let telegramBot: TelegramBot | null = null;
   let approvalManager: ApprovalManager | null = null;
+  let questionHandler: QuestionHandler | null = null;
   let notifications: NotificationManager | null = null;
   const botToken = process.env["TELEGRAM_BOT_TOKEN"];
   const chatId = process.env["TELEGRAM_CHAT_ID"];
@@ -131,6 +132,8 @@ async function main(): Promise<void> {
     );
     const replyEvaluator = new ReplyEvaluator(config.escalation.evaluatorModel, costTracker);
     approvalManager.setReplyEvaluator(replyEvaluator);
+    questionHandler = new QuestionHandler(telegramBot, chatId);
+    approvalManager.setQuestionHandler(questionHandler);
     notifications = new NotificationManager(telegramBot, sessionTracker, config.telegram);
     log.info("Telegram bot configured");
   } else {
@@ -155,7 +158,7 @@ async function main(): Promise<void> {
   });
 
   // Build hook handlers
-  const preToolUse = createPreToolUseHandler(() => ruleEngine, escalationHandler, auditLog, sessionTracker);
+  const preToolUse = createPreToolUseHandler(() => ruleEngine, escalationHandler, auditLog, sessionTracker, questionHandler);
   const stop = createStopHandler(config.stop, sessionTracker, approvalManager);
   const sessionStart = createSessionStartHandler(sessionTracker, notifications);
   const sessionEnd = createSessionEndHandler(sessionTracker, notifications);

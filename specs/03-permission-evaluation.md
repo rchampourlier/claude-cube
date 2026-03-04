@@ -2,6 +2,16 @@
 
 The PreToolUse handler is the core of ClaudeCube's permission system. Every tool call from a monitored Claude Code session flows through this handler, which coordinates the rule engine, escalation pipeline, session tracking, and audit logging.
 
+## 3.0 Early Interception
+
+`AskUserQuestion` is intercepted **before the rule engine**. This is a content question (the agent asking the user something), not a permission question.
+
+- If a `QuestionHandler` is available (Telegram configured): route to Telegram, collect the answer, return `decision: "block"` with the answer as the reason. The agent reads the block reason as the user's response.
+- If no Telegram: passthrough (`{}`) — the terminal handles it normally.
+- The tool call **never reaches** the rule engine or escalation pipeline.
+
+See [AskUserQuestion Routing](12-ask-user-question.md) for full details.
+
 ## 3.1 PreToolUse Handler
 
 The handler is created via the factory function `createPreToolUseHandler()` in `src/hooks/pre-tool-use.ts`.
@@ -42,6 +52,12 @@ The response includes both top-level `decision`/`reason` fields and a `hookSpeci
    |-- ensureRegistered(sessionId, cwd)    [auto-registers if unknown]
    |-- updateToolUse(sessionId, toolName)
    |-- updateState(sessionId, "permission_pending")
+   v
+1b. AskUserQuestion check
+   |-- tool is "AskUserQuestion" AND questionHandler exists?
+   |     |-- yes -> route to Telegram, return block with answer
+   |     |-- no Telegram -> return {} (passthrough)
+   |-- not AskUserQuestion -> fall through to step 2
    v
 2. Rule engine evaluation
    |-- ruleEngine.evaluate(toolName, toolInput)
@@ -111,7 +127,7 @@ interface AuditEntry {
   toolInput: Record<string, unknown>;
   decision: "allow" | "deny";
   reason: string;
-  decidedBy: "rule" | "llm" | "telegram" | "timeout";
+  decidedBy: "rule" | "llm" | "telegram" | "timeout" | "telegram-question";
   ruleName?: string;
 }
 ```

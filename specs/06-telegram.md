@@ -64,7 +64,7 @@ Non-command, non-reply text messages are forwarded to the first Claude pane in t
 
 ## 6.2 Message-to-Session Mapping
 
-Every message sent by ClaudeCube to Telegram (approval requests, stop decisions) is mapped to the originating session and tmux pane. This enables correct routing when the user replies.
+Every message sent by ClaudeCube to Telegram (approval requests, stop decisions, questions) is mapped to the originating session and tmux pane. This enables correct routing when the user replies. `QuestionHandler` maintains its own parallel mapping (`questionMessages: Map<messageId, pendingId>`) for question messages.
 
 ### Data Structure
 
@@ -300,6 +300,34 @@ The Telegram bot provides remote control of tmux-based Claude sessions:
 This uses the `listClaudePanes()` and `sendKeys()` functions from `src/tmux.ts` (see [Session Management](07-session-management.md)).
 
 `sendKeys()` uses the `-l` flag to send text literally (preventing tmux from interpreting key names within the text), then sends `Enter` as a separate call to ensure the input is submitted.
+
+## 6.8 AskUserQuestion Routing
+
+The `QuestionHandler` class (`src/telegram/question-handler.ts`) handles agent questions routed from the PreToolUse handler.
+
+### Entry Point
+
+`handleQuestion(toolInput, context)` — iterates questions from the tool input, calls `sendQuestion()` sequentially, and returns a formatted block reason containing all answers.
+
+### Message Format
+
+Each question is sent as a Telegram message with inline keyboard buttons (one per option). Single-select questions resolve on the first tap; multi-select questions use toggle buttons (✅/⬜ prefix) with a "Done" button.
+
+### Callback Handlers
+
+- `qopt:<id>:<index>` — option selection (single-select resolves immediately; multi-select toggles)
+- `qdone:<id>` — multi-select "Done" button, resolves with comma-joined selected labels
+
+### Text Reply Integration
+
+`tryHandleReply(messageId, text, ctx)` is called from `ApprovalManager`'s text reply handler. If the replied-to message is a pending question, the text is used as a custom "Other" answer. Returns `true` if handled, `false` otherwise.
+
+### Internal State
+
+- `pending: Map<id, PendingQuestion>` — tracks active questions awaiting answers
+- `questionMessages: Map<messageId, pendingId>` — maps Telegram message IDs to pending question IDs for reply routing
+
+See [AskUserQuestion Routing](12-ask-user-question.md) for the full specification.
 
 ## Cross-References
 

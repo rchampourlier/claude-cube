@@ -1,6 +1,7 @@
 import { Markup } from "telegraf";
 import type { TelegramBot } from "./bot.js";
 import type { ReplyEvaluator } from "./reply-evaluator.js";
+import type { QuestionHandler } from "./question-handler.js";
 import type { SessionTracker } from "../session-tracker.js";
 import { readTranscript, formatRecentActivity, summarizeTranscript } from "../transcript/index.js";
 import { findPaneForCwd, sendKeys } from "../tmux.js";
@@ -37,6 +38,7 @@ export class ApprovalManager {
   private messageContext = new Map<number, MessageContext>();
   private counter = 0;
   private replyEvaluator: ReplyEvaluator | null = null;
+  private questionHandler: QuestionHandler | null = null;
 
   constructor(
     private bot: TelegramBot,
@@ -50,6 +52,10 @@ export class ApprovalManager {
 
   setReplyEvaluator(evaluator: ReplyEvaluator): void {
     this.replyEvaluator = evaluator;
+  }
+
+  setQuestionHandler(handler: QuestionHandler): void {
+    this.questionHandler = handler;
   }
 
   private setupCallbackHandler(): void {
@@ -160,6 +166,12 @@ export class ApprovalManager {
     this.bot.callbackQuery.on("text", async (ctx) => {
       const replyTo = ctx.message.reply_to_message;
       if (!replyTo) return;
+
+      // Check if this reply is for a question (not an approval)
+      if (this.questionHandler?.tryHandleReply(replyTo.message_id, ctx.message.text)) {
+        ctx.reply("✅ Answer received", { reply_parameters: { message_id: replyTo.message_id } });
+        return;
+      }
 
       const msgCtx = this.messageContext.get(replyTo.message_id);
       if (!msgCtx) return;

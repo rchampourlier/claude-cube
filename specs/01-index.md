@@ -29,7 +29,10 @@ hooks/claudecube-hook.sh  (reads JSON stdin, POSTs to ClaudeCube, outputs respon
   v
 HTTP Server (server.ts)
   |
-  |-- PreToolUse -----> Rule Engine (deny/allow/escalate)
+  |-- PreToolUse -----> AskUserQuestion check (early intercept)
+  |                       |-- AskUserQuestion -> Telegram question routing
+  |                                               (bypasses rule engine)
+  |                     Rule Engine (deny/allow/escalate)
   |                       |-- deny ----> BLOCK (immediate)
   |                       |-- allow ---> APPROVE (immediate)
   |                       |-- escalate -> LLM Evaluator (Haiku)
@@ -79,6 +82,7 @@ On startup:
 | 9 | [Configuration](09-configuration.md) | Orchestrator config, rules config, environment variables |
 | 10 | [Infrastructure & Deployment](10-infrastructure.md) | HTTP server, CLI, installer, logging, project setup |
 | 11 | [Transcript Analysis](11-transcript-analysis.md) | Transcript reader, LLM summarizer, integration with approval and stop flows |
+| 12 | [AskUserQuestion Routing](12-ask-user-question.md) | Intercept agent questions, route to Telegram, deliver answers via block reason |
 
 ## Supplementary Documents
 
