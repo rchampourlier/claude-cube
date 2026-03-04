@@ -8,7 +8,7 @@ import { createLogger } from "../util/logger.js";
 const log = createLogger("telegram-bot");
 
 const COMMANDS = [
-  { command: "start", description: "Verify bot connection and show chat ID" },
+  { command: "start", description: "Show chat ID (for initial setup)" },
   { command: "status", description: "List all active Claude sessions" },
   { command: "send", description: "Send text to a tmux pane", usage: "/send <window> <text>" },
   { command: "mode", description: "Toggle or set operating mode", usage: "/mode [local|remote]" },
