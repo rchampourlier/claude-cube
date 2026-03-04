@@ -12,8 +12,8 @@ const log = createLogger("session-tracker");
 export type SessionState = "active" | "idle" | "permission_pending";
 
 export interface SessionTrackerDeps {
-  resolveLabel: (cwd: string) => string | null;
-  findPaneForCwd: (cwd: string) => string | null;
+  resolveLabel: (cwd: string, paneId?: string | null) => string | null;
+  findPaneForCwd: (cwd: string, paneId?: string | null) => string | null;
   listClaudePanes: () => TmuxPane[];
 }
 
@@ -45,9 +45,10 @@ export class SessionTracker {
     };
   }
 
-  register(sessionId: string, cwd: string, transcriptPath?: string): void {
-    const tmuxLabel = this.deps.resolveLabel(cwd);
+  register(sessionId: string, cwd: string, transcriptPath?: string, tmuxPaneId?: string): void {
+    const tmuxLabel = this.deps.resolveLabel(cwd, tmuxPaneId);
     const label = tmuxLabel ?? basename(cwd);
+    const paneId = this.deps.findPaneForCwd(cwd, tmuxPaneId);
     this.sessions.set(sessionId, {
       sessionId,
       cwd,
@@ -57,10 +58,10 @@ export class SessionTracker {
       lastActivity: Date.now(),
       denialCount: 0,
       label,
-      paneId: this.deps.findPaneForCwd(cwd),
+      paneId,
       transcriptPath: transcriptPath ?? null,
     });
-    log.info("Session registered", { sessionId, label, cwd });
+    log.info("Session registered", { sessionId, label, paneId, cwd });
   }
 
   deregister(sessionId: string): void {
@@ -95,7 +96,8 @@ export class SessionTracker {
     const panes = this.deps.listClaudePanes();
     for (const pane of panes) {
       const syntheticId = `tmux_${pane.paneId}`;
-      if (!this.findByCwd(pane.paneCwd)) {
+      // Register every pane — multiple panes may share the same CWD
+      if (!this.sessions.has(syntheticId)) {
         this.sessions.set(syntheticId, {
           sessionId: syntheticId,
           cwd: pane.paneCwd,
@@ -126,11 +128,19 @@ export class SessionTracker {
     return undefined;
   }
 
+  /** Find a session by its tmux pane ID. */
+  findByPaneId(paneId: string): SessionInfo | undefined {
+    for (const session of this.sessions.values()) {
+      if (session.paneId === paneId) return session;
+    }
+    return undefined;
+  }
+
   /**
    * Auto-register a session if it's not already tracked.
-   * If a synthetic tmux session exists with the same cwd, merge into the real session.
+   * If a synthetic tmux session exists for the same pane (or cwd), merge into the real session.
    */
-  ensureRegistered(sessionId: string, cwd: string, transcriptPath?: string): void {
+  ensureRegistered(sessionId: string, cwd: string, transcriptPath?: string, tmuxPaneId?: string): void {
     const existing = this.sessions.get(sessionId);
     if (existing) {
       // Store transcriptPath when first provided
@@ -140,8 +150,10 @@ export class SessionTracker {
       return;
     }
 
-    // Check for a synthetic session with the same cwd to merge
-    const synthetic = this.findByCwd(cwd);
+    // Match synthetic session: prefer pane ID (exact), fall back to CWD
+    const synthetic = tmuxPaneId
+      ? this.findByPaneId(tmuxPaneId)
+      : this.findByCwd(cwd);
     if (synthetic && synthetic.sessionId.startsWith("tmux_")) {
       // Merge: transfer label, startedAt, denialCount from synthetic
       this.sessions.delete(synthetic.sessionId);
@@ -154,7 +166,7 @@ export class SessionTracker {
       return;
     }
 
-    this.register(sessionId, cwd, transcriptPath);
+    this.register(sessionId, cwd, transcriptPath, tmuxPaneId);
     log.info("Auto-registered unknown session", { sessionId });
   }
 
@@ -180,7 +192,7 @@ export class SessionTracker {
   refreshLabel(sessionId: string): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
-    const tmuxLabel = this.deps.resolveLabel(session.cwd);
+    const tmuxLabel = this.deps.resolveLabel(session.cwd, session.paneId);
     if (tmuxLabel && tmuxLabel !== session.label) {
       log.info("Session label refreshed", { sessionId, oldLabel: session.label, newLabel: tmuxLabel });
       session.label = tmuxLabel;

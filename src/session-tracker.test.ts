@@ -75,6 +75,50 @@ describe("SessionTracker", () => {
     });
   });
 
+  describe("multiple panes sharing the same cwd", () => {
+    it("registerFromTmux registers all panes even with duplicate CWDs", () => {
+      const sharedCwd = "/Users/romain/dev/claude-cube";
+      tracker = new SessionTracker({
+        resolveLabel: () => null,
+        findPaneForCwd: () => null,
+        listClaudePanes: () => [
+          { sessionName: "main", windowIndex: "1", windowName: "backups", paneIndex: "0", paneId: "%10", paneCwd: sharedCwd, command: "claude" },
+          { sessionName: "main", windowIndex: "2", windowName: "pentest", paneIndex: "0", paneId: "%20", paneCwd: sharedCwd, command: "claude" },
+        ],
+      });
+      tracker.registerFromTmux();
+
+      const all = tracker.getAll();
+      assert.equal(all.length, 2, "both panes should be registered");
+      assert.equal(all.find((s) => s.paneId === "%10")?.label, "backups");
+      assert.equal(all.find((s) => s.paneId === "%20")?.label, "pentest");
+    });
+
+    it("ensureRegistered merges the correct synthetic session by pane ID", () => {
+      const sharedCwd = "/Users/romain/dev/claude-cube";
+      tracker = new SessionTracker({
+        resolveLabel: (_cwd, paneId) => paneId === "%20" ? "pentest" : paneId === "%10" ? "backups" : null,
+        findPaneForCwd: (_cwd, paneId) => paneId ?? null,
+        listClaudePanes: () => [
+          { sessionName: "main", windowIndex: "1", windowName: "backups", paneIndex: "0", paneId: "%10", paneCwd: sharedCwd, command: "claude" },
+          { sessionName: "main", windowIndex: "2", windowName: "pentest", paneIndex: "0", paneId: "%20", paneCwd: sharedCwd, command: "claude" },
+        ],
+      });
+      tracker.registerFromTmux();
+
+      // New real session from the "pentest" pane
+      tracker.ensureRegistered("real-session-pentest", sharedCwd, "/tmp/t.jsonl", "%20");
+      assert.equal(tracker.getLabel("real-session-pentest"), "pentest");
+      assert.equal(tracker.getPaneId("real-session-pentest"), "%20");
+
+      // The "backups" synthetic should still exist
+      const all = tracker.getAll();
+      const backups = all.find((s) => s.paneId === "%10");
+      assert.ok(backups, "backups synthetic session should still exist");
+      assert.equal(backups!.label, "backups");
+    });
+  });
+
   describe("label propagation to escalation context", () => {
     beforeEach(() => {
       tracker = new SessionTracker({

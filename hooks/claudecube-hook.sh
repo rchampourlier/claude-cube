@@ -5,6 +5,11 @@
 INPUT=$(cat)
 EVENT=$(echo "$INPUT" | jq -r '.hook_event_name')
 
+# Inject TMUX_PANE so the server can identify the exact pane
+if [ -n "$TMUX_PANE" ]; then
+  INPUT=$(echo "$INPUT" | jq --arg pane "$TMUX_PANE" '. + {tmux_pane: $pane}')
+fi
+
 # Prevent infinite Stop loops
 if [ "$EVENT" = "Stop" ]; then
   if [ "$(echo "$INPUT" | jq -r '.stop_hook_active')" = "true" ]; then

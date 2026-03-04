@@ -36,19 +36,24 @@ export function listClaudePanes(): TmuxPane[] {
 
 /**
  * Find the tmux pane running claude in the given cwd.
+ * When paneId is provided, matches by pane ID (exact). Otherwise falls back to CWD scan.
  * Returns a human-readable label like "session:window" or null.
  */
-export function resolveLabel(cwd: string): string | null {
+export function resolveLabel(cwd: string, paneId?: string | null): string | null {
   const panes = listClaudePanes();
-  const match = panes.find((p) => p.paneCwd === cwd);
+  const match = paneId
+    ? panes.find((p) => p.paneId === paneId)
+    : panes.find((p) => p.paneCwd === cwd);
   if (!match) return null;
   return match.windowName;
 }
 
 /**
  * Find the tmux pane ID running claude in the given cwd.
+ * When paneId is already known, validates it exists and returns it.
  */
-export function findPaneForCwd(cwd: string): string | null {
+export function findPaneForCwd(cwd: string, paneId?: string | null): string | null {
+  if (paneId) return paneId;
   const panes = listClaudePanes();
   const match = panes.find((p) => p.paneCwd === cwd);
   return match?.paneId ?? null;

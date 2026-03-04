@@ -14,6 +14,7 @@ export interface StopInput {
   transcript_path: string;
   stop_hook_active?: boolean;
   last_assistant_message?: string;
+  tmux_pane?: string;
 }
 
 export interface StopResponse {
@@ -33,7 +34,7 @@ export function createStopHandler(
   return async (input: StopInput): Promise<StopResponse> => {
     const { session_id: sessionId, stop_hook_active: stopHookActive, last_assistant_message: lastMessage } = input;
 
-    sessionTracker.ensureRegistered(sessionId, input.cwd, input.transcript_path);
+    sessionTracker.ensureRegistered(sessionId, input.cwd, input.transcript_path, input.tmux_pane);
     const label = sessionTracker.getLabel(sessionId);
 
     // Prevent infinite loops — if this stop was triggered by a previous block, let it stop

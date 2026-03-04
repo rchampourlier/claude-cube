@@ -15,6 +15,7 @@ export interface PreToolUseInput {
   session_id: string;
   cwd: string;
   transcript_path: string;
+  tmux_pane?: string;
 }
 
 export interface PreToolUseResponse {
@@ -41,7 +42,7 @@ export function createPreToolUseHandler(
     const label = sessionTracker.getLabel(sessionId);
     log.info("PreToolUse", { toolName }, label);
 
-    sessionTracker.ensureRegistered(sessionId, input.cwd, input.transcript_path);
+    sessionTracker.ensureRegistered(sessionId, input.cwd, input.transcript_path, input.tmux_pane);
     sessionTracker.updateToolUse(sessionId, toolName);
     sessionTracker.updateState(sessionId, "permission_pending");
 

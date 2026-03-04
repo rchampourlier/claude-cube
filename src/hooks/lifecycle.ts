@@ -9,6 +9,7 @@ export interface SessionStartInput {
   session_id: string;
   cwd: string;
   transcript_path: string;
+  tmux_pane?: string;
 }
 
 export interface SessionEndInput {
@@ -31,9 +32,9 @@ export function createSessionStartHandler(
   notifications: NotificationManager | null,
 ) {
   return async (input: SessionStartInput): Promise<Record<string, never>> => {
-    const { session_id: sessionId, cwd, transcript_path: transcriptPath } = input;
-    log.info("SessionStart", { sessionId, cwd });
-    sessionTracker.register(sessionId, cwd, transcriptPath);
+    const { session_id: sessionId, cwd, transcript_path: transcriptPath, tmux_pane: tmuxPaneId } = input;
+    log.info("SessionStart", { sessionId, cwd, tmuxPaneId });
+    sessionTracker.register(sessionId, cwd, transcriptPath, tmuxPaneId);
     await notifications?.sessionStarted(sessionId, cwd);
     return {};
   };
