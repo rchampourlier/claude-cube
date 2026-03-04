@@ -1,6 +1,7 @@
 import { Telegraf } from "telegraf";
 import type { SessionTracker } from "../session-tracker.js";
 import type { CostTracker } from "../costs/tracker.js";
+import type { ModeManager } from "../mode.js";
 import { listClaudePanes, sendKeys } from "../tmux.js";
 import { createLogger } from "../util/logger.js";
 
@@ -10,6 +11,7 @@ const COMMANDS = [
   { command: "start", description: "Verify bot connection and show chat ID" },
   { command: "status", description: "List all active Claude sessions" },
   { command: "send", description: "Send text to a tmux pane", usage: "/send <window> <text>" },
+  { command: "mode", description: "Toggle or set operating mode", usage: "/mode [local|remote]" },
   { command: "cost", description: "Show ClaudeCube's own LLM costs (today + month)" },
   { command: "help", description: "Show this help message" },
 ];
@@ -17,6 +19,7 @@ const COMMANDS = [
 export interface TelegramBotDeps {
   sessionTracker: SessionTracker;
   costTracker?: CostTracker;
+  modeManager?: ModeManager;
   onFreeText?: (chatId: number, text: string) => void;
 }
 
@@ -123,6 +126,25 @@ export class TelegramBot {
           `<b>Month to date:</b> ${fmtCents(totals.month.costCents)} (${totals.month.calls} calls)`,
         { parse_mode: "HTML" },
       );
+    });
+
+    this.bot.command("mode", (ctx) => {
+      const mm = this.deps.modeManager;
+      if (!mm) {
+        ctx.reply("Mode manager not available.");
+        return;
+      }
+      const arg = ctx.message.text.split(/\s+/)[1]?.toLowerCase();
+      if (arg === "local" || arg === "remote") {
+        mm.setMode(arg);
+      } else if (!arg) {
+        // Toggle
+        mm.setMode(mm.getMode() === "remote" ? "local" : "remote");
+      } else {
+        ctx.reply("Usage: /mode [local|remote]");
+        return;
+      }
+      ctx.reply(`Mode switched to <b>${mm.getMode()}</b>`, { parse_mode: "HTML" });
     });
 
     this.bot.command("help", (ctx) => {

@@ -8,13 +8,14 @@ This is a **content question**, not a permission question — the agent is askin
 
 ## 12.2 Interception Point
 
-Early in the PreToolUse handler, **before the rule engine**. When Telegram is unavailable, passthrough (`{}`) lets the terminal handle it normally.
+Early in the PreToolUse handler, **before the rule engine**. In local mode or when Telegram is unavailable, passthrough (`{}`) lets the terminal handle it normally.
 
 ```
 PreToolUse input received
   |-- session tracking (ensureRegistered, updateToolUse, updateState)
-  |-- tool is "AskUserQuestion" AND questionHandler exists?
-  |     |-- yes -> route to Telegram, return block with answer
+  |-- tool is "AskUserQuestion"?
+  |     |-- local mode? -> return {} (passthrough)
+  |     |-- questionHandler exists? -> route to Telegram, return block with answer
   |     |-- no Telegram -> return {} (passthrough)
   |-- not AskUserQuestion -> fall through to rule engine
 ```
@@ -109,6 +110,7 @@ Callback data format is well within Telegram's 64-byte limit.
 
 | Scenario | Behavior |
 |---|---|
+| Local mode active | Passthrough (`{}`) — terminal handles normally (checked before Telegram) |
 | No Telegram configured | Passthrough (`{}`) — terminal handles normally |
 | Telegram send fails | Passthrough (`{}`) — graceful degradation |
 | Zero multi-select selections | "Done" with no selections resolves with "(no selection)" |

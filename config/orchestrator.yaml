@@ -21,3 +21,11 @@ stop:
   maxRetries: 2
   # When uncertain, ask via Telegram
   escalateToTelegram: true
+
+mode:
+  # Startup mode: "remote" (full Telegram oversight) or "local" (passthrough)
+  default: "remote"
+  # macOS-only: auto-switch based on idle time
+  autoDetect: false
+  idleThresholdSeconds: 300
+  pollIntervalSeconds: 60

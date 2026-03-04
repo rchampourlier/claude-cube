@@ -6,11 +6,12 @@ The PreToolUse handler is the core of ClaudeCube's permission system. Every tool
 
 `AskUserQuestion` is intercepted **before the rule engine**. This is a content question (the agent asking the user something), not a permission question.
 
-- If a `QuestionHandler` is available (Telegram configured): route to Telegram, collect the answer, return `decision: "block"` with the answer as the reason. The agent reads the block reason as the user's response.
+- If **local mode** is active: passthrough (`{}`) — the terminal handles it normally. No Telegram message is sent.
+- If a `QuestionHandler` is available (Telegram configured, remote mode): route to Telegram, collect the answer, return `decision: "block"` with the answer as the reason. The agent reads the block reason as the user's response.
 - If no Telegram: passthrough (`{}`) — the terminal handles it normally.
 - The tool call **never reaches** the rule engine or escalation pipeline.
 
-See [AskUserQuestion Routing](12-ask-user-question.md) for full details.
+See [AskUserQuestion Routing](12-ask-user-question.md) for full details. See [Local Mode](13-local-mode.md) for mode behavior.
 
 ## 3.1 PreToolUse Handler
 
@@ -54,8 +55,9 @@ The response includes both top-level `decision`/`reason` fields and a `hookSpeci
    |-- updateState(sessionId, "permission_pending")
    v
 1b. AskUserQuestion check
-   |-- tool is "AskUserQuestion" AND questionHandler exists?
-   |     |-- yes -> route to Telegram, return block with answer
+   |-- tool is "AskUserQuestion"?
+   |     |-- local mode? -> return {} (passthrough)
+   |     |-- questionHandler exists? -> route to Telegram, return block with answer
    |     |-- no Telegram -> return {} (passthrough)
    |-- not AskUserQuestion -> fall through to step 2
    v
@@ -83,6 +85,11 @@ The response includes both top-level `decision`/`reason` fields and a `hookSpeci
    |     |-- auditLog.log({ decidedBy: "llm"|"telegram", ... })
    |     |-- sessionTracker.updateState("active")
    |     |-- return { decision: "approve", hookSpecificOutput: { permissionDecision: "allow" } }
+   |
+   |-- escalation passthrough (local mode, LLM uncertain/deny)
+   |     |-- auditLog.log({ decidedBy: "passthrough", ... })
+   |     |-- sessionTracker.updateState("active")
+   |     |-- return {} (passthrough to terminal)
    |
    |-- escalation denied
          |-- auditLog.log({ decidedBy: "llm"|"telegram"|"timeout", ... })
@@ -127,7 +134,7 @@ interface AuditEntry {
   toolInput: Record<string, unknown>;
   decision: "allow" | "deny";
   reason: string;
-  decidedBy: "rule" | "llm" | "telegram" | "timeout" | "telegram-question";
+  decidedBy: "rule" | "llm" | "telegram" | "timeout" | "telegram-question" | "passthrough";
   ruleName?: string;
 }
 ```

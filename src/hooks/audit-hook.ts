@@ -11,7 +11,7 @@ export interface AuditEntry {
   toolInput: Record<string, unknown>;
   decision: "allow" | "deny";
   reason: string;
-  decidedBy: "rule" | "llm" | "telegram" | "timeout" | "telegram-question";
+  decidedBy: "rule" | "llm" | "telegram" | "timeout" | "telegram-question" | "passthrough";
   ruleName?: string;
 }
 

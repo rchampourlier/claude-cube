@@ -18,6 +18,7 @@ import {
   createNotificationHandler,
 } from "./hooks/lifecycle.js";
 import { SessionTracker } from "./session-tracker.js";
+import { ModeManager } from "./mode.js";
 import { createHttpServer } from "./server.js";
 import { TelegramBot, ApprovalManager, NotificationManager, ReplyEvaluator, QuestionHandler } from "./telegram/index.js";
 import { PolicyStore } from "./policies/index.js";
@@ -110,6 +111,7 @@ async function main(): Promise<void> {
   const costTracker = new CostTracker(auditDir);
   const policyStore = new PolicyStore(resolve("config/policies.yaml"), resolve("config/policies.local.yaml"));
   const sessionTracker = new SessionTracker();
+  const modeManager = new ModeManager(config.mode.default);
 
   // Telegram setup
   let telegramBot: TelegramBot | null = null;
@@ -123,6 +125,7 @@ async function main(): Promise<void> {
     telegramBot = new TelegramBot(botToken, chatId, {
       sessionTracker,
       costTracker,
+      modeManager,
     });
     approvalManager = new ApprovalManager(
       telegramBot,
@@ -140,7 +143,7 @@ async function main(): Promise<void> {
     log.warn("Telegram not configured (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID)");
   }
 
-  const escalationHandler = new EscalationHandler(config.escalation, approvalManager, policyStore, costTracker);
+  const escalationHandler = new EscalationHandler(config.escalation, approvalManager, policyStore, costTracker, modeManager);
 
   // Watch rules file for hot-reload
   let rulesReloadTimer: ReturnType<typeof setTimeout> | null = null;
@@ -158,8 +161,8 @@ async function main(): Promise<void> {
   });
 
   // Build hook handlers
-  const preToolUse = createPreToolUseHandler(() => ruleEngine, escalationHandler, auditLog, sessionTracker, questionHandler);
-  const stop = createStopHandler(config.stop, sessionTracker, approvalManager);
+  const preToolUse = createPreToolUseHandler(() => ruleEngine, escalationHandler, auditLog, sessionTracker, questionHandler, modeManager);
+  const stop = createStopHandler(config.stop, sessionTracker, approvalManager, modeManager);
   const sessionStart = createSessionStartHandler(sessionTracker, notifications);
   const sessionEnd = createSessionEndHandler(sessionTracker, notifications);
   const notification = createNotificationHandler(sessionTracker);
@@ -175,6 +178,7 @@ async function main(): Promise<void> {
       Notification: notification,
     },
     sessionTracker,
+    modeManager,
   );
 
   await httpServer.start();

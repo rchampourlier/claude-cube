@@ -1,6 +1,7 @@
 import type { StopConfig } from "../config/types.js";
 import type { SessionTracker } from "../session-tracker.js";
 import type { ApprovalManager } from "../telegram/approval.js";
+import type { ModeManager } from "../mode.js";
 import { readTranscript, extractRecentTools, summarizeTranscript } from "../transcript/index.js";
 import { createLogger } from "../util/logger.js";
 
@@ -27,6 +28,7 @@ export function createStopHandler(
   config: StopConfig,
   sessionTracker: SessionTracker,
   approvalManager: ApprovalManager | null,
+  modeManager: ModeManager | null = null,
 ) {
   return async (input: StopInput): Promise<StopResponse> => {
     const { session_id: sessionId, stop_hook_active: stopHookActive, last_assistant_message: lastMessage } = input;
@@ -63,6 +65,13 @@ export function createStopHandler(
       log.info("Max retries reached, falling through to transcript analysis", undefined, label);
       retryCount.delete(sessionId);
       // Fall through to transcript analysis + Telegram below
+    }
+
+    // Local mode: skip Telegram, let stop
+    if (modeManager?.isLocal()) {
+      log.info("Local mode — letting stop through", undefined, label);
+      retryCount.delete(sessionId);
+      return {};
     }
 
     // All stops (after retry exhaustion, questions, normal) go through transcript analysis + Telegram

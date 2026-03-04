@@ -42,6 +42,7 @@ All incoming messages are filtered through a middleware that checks `ctx.chat.id
 | `/status` | Lists all active sessions | Queries `SessionTracker.getAll()`, formats with state, denial count, CWD, last tool, age |
 | `/send <window-name> <text>` | Sends text to a Claude session by tmux window name | Resolves window name to pane ID, then calls `sendKeys()` |
 | `/cost` | Shows ClaudeCube's own LLM costs (today + month) | Reads from local `CostTracker.getTotals()` (no admin API key needed) |
+| `/mode` | Toggles or sets operating mode (local/remote) | See [§6.9 Mode Command](#69-mode-command) |
 | `/help` | Lists all available commands | Iterates the `COMMANDS` registry in `bot.ts` |
 
 ### /send by Window Name
@@ -328,6 +329,26 @@ Each question is sent as a Telegram message with inline keyboard buttons (one pe
 - `questionMessages: Map<messageId, pendingId>` — maps Telegram message IDs to pending question IDs for reply routing
 
 See [AskUserQuestion Routing](12-ask-user-question.md) for the full specification.
+
+## 6.9 Mode Command
+
+The `/mode` command controls ClaudeCube's operating mode via the `ModeManager`.
+
+### Usage
+
+| Command | Action |
+|---|---|
+| `/mode` | Toggles between local and remote |
+| `/mode local` | Switches to local mode |
+| `/mode remote` | Switches to remote mode |
+
+### Behavior
+
+- Calls `modeManager.setMode()` and replies with a confirmation message (e.g., "Mode switched to **local**").
+- The Telegram bot stays running in local mode specifically so this command remains available for switching back.
+- In local mode, the bot still processes `/mode` and other commands (`/status`, `/send`, `/cost`, `/help`). Only approval/stop/question messages are suppressed.
+
+See [Local Mode](13-local-mode.md) for full mode behavior.
 
 ## Cross-References
 

@@ -3,6 +3,7 @@ import type { EscalationHandler } from "../escalation/handler.js";
 import type { AuditLog } from "./audit-hook.js";
 import type { SessionTracker } from "../session-tracker.js";
 import type { QuestionHandler } from "../telegram/question-handler.js";
+import type { ModeManager } from "../mode.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("pre-tool-use");
@@ -32,6 +33,7 @@ export function createPreToolUseHandler(
   auditLog: AuditLog,
   sessionTracker: SessionTracker,
   questionHandler: QuestionHandler | null = null,
+  modeManager: ModeManager | null = null,
 ) {
   return async (input: PreToolUseInput): Promise<PreToolUseResponse> => {
     const { tool_name: toolName, tool_input: toolInput, session_id: sessionId } = input;
@@ -45,6 +47,12 @@ export function createPreToolUseHandler(
 
     // Step 0: AskUserQuestion early intercept (before rule engine)
     if (toolName === "AskUserQuestion") {
+      if (modeManager?.isLocal()) {
+        log.info("AskUserQuestion passthrough (local mode)", {}, label);
+        sessionTracker.updateState(sessionId, "active");
+        return {};
+      }
+
       if (!questionHandler) {
         // No Telegram — passthrough to let the terminal handle it
         log.info("AskUserQuestion passthrough (no Telegram)", {}, label);
@@ -144,6 +152,21 @@ export function createPreToolUseHandler(
         escalationReason: result.reason,
       },
     );
+
+    // Passthrough: local mode — return {} to let terminal handle it
+    if (escalationResult.decidedBy === "passthrough") {
+      auditLog.log({
+        sessionId,
+        toolName,
+        toolInput,
+        decision: "allow",
+        reason: escalationResult.reason,
+        decidedBy: "passthrough",
+        ruleName: result.rule?.name,
+      });
+      sessionTracker.updateState(sessionId, "active");
+      return {};
+    }
 
     const decision = escalationResult.allowed ? "allow" : "deny";
     auditLog.log({

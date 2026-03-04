@@ -92,7 +92,7 @@ The `EscalationHandler` class (`src/escalation/handler.ts`) orchestrates the two
 interface EscalationDecision {
   allowed: boolean;
   reason: string;
-  decidedBy: "llm" | "telegram" | "timeout";
+  decidedBy: "llm" | "telegram" | "timeout" | "passthrough";
 }
 
 class EscalationHandler {
@@ -115,10 +115,18 @@ Step 1: LLM Evaluation
   |     --> return { allowed: true, decidedBy: "llm" }
   |
   |-- LLM confident AND denied
-  |     --> escalate to Telegram (LLM never auto-denies)
+  |     --> fall through (LLM never auto-denies)
   |
   |-- LLM uncertain (confident = false)
-        --> escalate to Telegram
+        --> fall through
+
+Step 1b: Mode Check
+  |
+  |-- local mode?
+  |     --> return { allowed: false, decidedBy: "passthrough" }
+  |         (caller returns {} to terminal)
+  |
+  |-- remote mode -> proceed to Step 2
 
 Step 2: Telegram Escalation
   |

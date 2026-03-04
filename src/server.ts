@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { SessionTracker } from "./session-tracker.js";
+import type { ModeManager } from "./mode.js";
 import { createLogger } from "./util/logger.js";
 
 const log = createLogger("server");
@@ -19,6 +20,7 @@ export function createHttpServer(
   port: number,
   routes: ServerRoutes,
   sessionTracker: SessionTracker,
+  modeManager: ModeManager | null = null,
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
@@ -27,6 +29,33 @@ export function createHttpServer(
         const sessions = sessionTracker.getAll();
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ sessions, count: sessions.length }));
+        return;
+      }
+
+      // GET /mode
+      if (req.method === "GET" && req.url === "/mode") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ mode: modeManager?.getMode() ?? "remote" }));
+        return;
+      }
+
+      // POST /mode
+      if (req.method === "POST" && req.url === "/mode") {
+        if (!modeManager) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Mode manager not available" }));
+          return;
+        }
+        const body = await readBody(req);
+        const mode = body.mode;
+        if (mode !== "local" && mode !== "remote") {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid mode. Use 'local' or 'remote'." }));
+          return;
+        }
+        modeManager.setMode(mode);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ mode: modeManager.getMode() }));
         return;
       }
 

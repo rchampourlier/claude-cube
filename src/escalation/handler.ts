@@ -3,6 +3,7 @@ import type { ApprovalManager, ApprovalResult } from "../telegram/approval.js";
 import type { PolicyStore } from "../policies/store.js";
 import type { CostTracker } from "../costs/tracker.js";
 import type { EscalationConfig } from "../config/types.js";
+import type { ModeManager } from "../mode.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("escalation-handler");
@@ -10,7 +11,7 @@ const log = createLogger("escalation-handler");
 export interface EscalationDecision {
   allowed: boolean;
   reason: string;
-  decidedBy: "llm" | "telegram" | "timeout";
+  decidedBy: "llm" | "telegram" | "timeout" | "passthrough";
 }
 
 export class EscalationHandler {
@@ -21,6 +22,7 @@ export class EscalationHandler {
     private approvalManager: ApprovalManager | null,
     private policyStore: PolicyStore | null = null,
     costTracker: CostTracker | null = null,
+    private modeManager: ModeManager | null = null,
   ) {
     this.evaluator = new LlmEvaluator(
       config.evaluatorModel,
@@ -62,10 +64,21 @@ export class EscalationHandler {
       };
     }
 
-    // LLM denied or uncertain → always escalate to Telegram
+    // LLM denied or uncertain → check mode before escalating to Telegram
     if (llmResult.confident) {
       log.info("LLM confident deny, escalating to Telegram anyway", { toolName, reason: llmResult.reason }, label);
     }
+
+    // Local mode: passthrough instead of Telegram
+    if (this.modeManager?.isLocal()) {
+      log.info("Local mode — passthrough to terminal", { toolName }, label);
+      return {
+        allowed: false,
+        reason: `LLM uncertain: ${llmResult.reason} (local mode passthrough)`,
+        decidedBy: "passthrough",
+      };
+    }
+
     if (!this.approvalManager) {
       log.warn("No Telegram approval manager; denying by default", { toolName });
       return {

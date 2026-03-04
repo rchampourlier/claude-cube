@@ -52,7 +52,10 @@ An empty object `{}` means "let the session stop normally."
    |     |-- retries >= maxRetries
    |           --> clear retries, FALL THROUGH to step 5
 
-5. Transcript analysis + Telegram escalation
+5. Mode check
+   |-- local mode? --> return {} (let stop, no Telegram)
+
+6. Transcript analysis + Telegram escalation
    |-- config.escalateToTelegram AND approvalManager?
    |     --> Read transcript (last 15 messages)
    |     --> Generate LLM summary (graceful degradation on failure)
@@ -65,7 +68,7 @@ An empty object `{}` means "let the session stop normally."
    |     |                                   reason: "User wants you to continue" }
    |     |-- denied/timeout ------> return {} (let stop)
 
-6. No Telegram --> clear retries, return {} (let stop)
+7. No Telegram --> clear retries, return {} (let stop)
 ```
 
 **Key change**: All stops (after retry exhaustion, questions, and normal completions) go through transcript analysis + Telegram escalation when `escalateToTelegram` is enabled. The previous behavior of only escalating questions is replaced by universal escalation with transcript context.
@@ -114,7 +117,7 @@ This message is passed back to Claude Code, which treats the blocked stop as an 
 
 ## 5.3 Transcript Analysis + Telegram Escalation
 
-All stops (after error retries are exhausted, on questions, and on normal completions) are escalated to Telegram with transcript analysis when `escalateToTelegram` is enabled.
+All stops (after error retries are exhausted, on questions, and on normal completions) are escalated to Telegram with transcript analysis when `escalateToTelegram` is enabled and **remote mode** is active. In local mode, the stop handler returns `{}` after retry exhaustion — transcript analysis and Telegram escalation are skipped entirely.
 
 ### Transcript Analysis
 

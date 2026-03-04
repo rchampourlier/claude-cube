@@ -28,6 +28,12 @@ stop:
   retryOnError: true
   maxRetries: 2
   escalateToTelegram: true
+
+mode:
+  default: "remote"
+  autoDetect: false
+  idleThresholdSeconds: 300
+  pollIntervalSeconds: 60
 ```
 
 ### Schema (from `src/config/types.ts`)
@@ -65,6 +71,17 @@ All fields have `.default()` values, making every field optional in the YAML.
 | `retryOnError` | boolean | `true` | Auto-retry when agent stops with an error |
 | `maxRetries` | integer >= 0 | `2` | Max consecutive retries before allowing stop |
 | `escalateToTelegram` | boolean | `true` | Escalate all stops to Telegram with transcript analysis (questions, errors after retries, normal completions) |
+
+#### `ModeConfigSchema`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `default` | `"remote"` \| `"local"` | `"remote"` | Operating mode at startup |
+| `autoDetect` | boolean | `false` | Enable idle-based auto-switching (macOS only) |
+| `idleThresholdSeconds` | positive integer | `300` | Seconds of idle time before switching to remote |
+| `pollIntervalSeconds` | positive integer | `60` | How often to check idle time (seconds) |
+
+See [Local Mode](13-local-mode.md) for full mode behavior.
 
 ### Loading (from `src/config/loader.ts`)
 

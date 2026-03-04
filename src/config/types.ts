@@ -24,15 +24,24 @@ export const StopConfigSchema = z.object({
   escalateToTelegram: z.boolean().default(true),
 });
 
+export const ModeConfigSchema = z.object({
+  default: z.enum(["remote", "local"]).default("remote"),
+  autoDetect: z.boolean().default(false),
+  idleThresholdSeconds: z.number().int().positive().default(300),
+  pollIntervalSeconds: z.number().int().positive().default(60),
+});
+
 export const OrchestratorConfigSchema = z.object({
   server: ServerConfigSchema,
   escalation: EscalationConfigSchema,
   telegram: TelegramConfigSchema,
   stop: StopConfigSchema,
+  mode: ModeConfigSchema,
 });
 
 export type ServerConfig = z.infer<typeof ServerConfigSchema>;
 export type EscalationConfig = z.infer<typeof EscalationConfigSchema>;
 export type TelegramConfig = z.infer<typeof TelegramConfigSchema>;
 export type StopConfig = z.infer<typeof StopConfigSchema>;
+export type ModeConfig = z.infer<typeof ModeConfigSchema>;
 export type OrchestratorConfig = z.infer<typeof OrchestratorConfigSchema>;

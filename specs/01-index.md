@@ -12,6 +12,7 @@
 - LLM-evaluated text replies: human replies are classified by intent (approve, deny, forward to session, add rule)
 - Policy learning: human decisions are saved and fed back to the LLM evaluator
 - Startup session discovery: scans tmux for existing Claude sessions on startup
+- Local/remote operating mode: toggle Telegram oversight on/off at runtime for local development
 - Fail-open design: if ClaudeCube is unreachable, Claude Code continues normally
 
 **Version:** 0.1.0 | **Runtime:** Node.js >= 22 (ESM) | **Language:** TypeScript (strict)
@@ -30,6 +31,7 @@ hooks/claudecube-hook.sh  (reads JSON stdin, POSTs to ClaudeCube, outputs respon
 HTTP Server (server.ts)
   |
   |-- PreToolUse -----> AskUserQuestion check (early intercept)
+  |                       |-- local mode? -> passthrough {} to terminal
   |                       |-- AskUserQuestion -> Telegram question routing
   |                                               (bypasses rule engine)
   |                     Rule Engine (deny/allow/escalate)
@@ -37,21 +39,24 @@ HTTP Server (server.ts)
   |                       |-- allow ---> APPROVE (immediate)
   |                       |-- escalate -> LLM Evaluator (Haiku)
   |                                        |-- confident allow -> APPROVE
-  |                                        |-- uncertain/deny --> Telegram approval
-  |                                                                |-- button approve -> APPROVE
-  |                                                                |-- button deny/timeout -> BLOCK
-  |                                                                |-- details button -> Transcript analysis
-  |                                                                |                     + LLM summary (non-resolving)
-  |                                                                |-- text reply -> LLM classifies intent:
-  |                                                                      |-- approve -> APPROVE
-  |                                                                      |-- deny -> BLOCK
-  |                                                                      |-- forward -> APPROVE + send to session
-  |                                                                      |-- add rule -> APPROVE + write rule
+  |                                        |-- uncertain/deny:
+  |                                            |-- local mode? -> passthrough {}
+  |                                            |-- remote mode -> Telegram approval
+  |                                                |-- button approve -> APPROVE
+  |                                                |-- button deny/timeout -> BLOCK
+  |                                                |-- details button -> Transcript analysis
+  |                                                |                     + LLM summary (non-resolving)
+  |                                                |-- text reply -> LLM classifies intent:
+  |                                                      |-- approve -> APPROVE
+  |                                                      |-- deny -> BLOCK
+  |                                                      |-- forward -> APPROVE + send to session
+  |                                                      |-- add rule -> APPROVE + write rule
   |
   |-- Stop -----------> Heuristics (error? question? normal?)
   |                       |-- error -> force retry (up to N times)
   |                       |   (after retries exhausted, falls through to analysis)
-  |                       |-- ALL stops (after retries) -> Transcript analysis
+  |                       |-- local mode? -> return {} (let stop)
+  |                       |-- remote mode -> Transcript analysis
   |                           + LLM summary + Telegram (continue/let stop)
   |
   |-- SessionStart ----> Register session + Telegram notification
@@ -83,6 +88,7 @@ On startup:
 | 10 | [Infrastructure & Deployment](10-infrastructure.md) | HTTP server, CLI, installer, logging, project setup |
 | 11 | [Transcript Analysis](11-transcript-analysis.md) | Transcript reader, LLM summarizer, integration with approval and stop flows |
 | 12 | [AskUserQuestion Routing](12-ask-user-question.md) | Intercept agent questions, route to Telegram, deliver answers via block reason |
+| 13 | [Local Mode](13-local-mode.md) | Local/remote mode toggle, passthrough behavior, switching mechanisms |
 
 ## Supplementary Documents
 
