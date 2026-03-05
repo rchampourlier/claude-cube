@@ -1,8 +1,9 @@
-import { Telegraf } from "telegraf";
+import { Telegraf, Markup } from "telegraf";
 import type { SessionTracker } from "../session-tracker.js";
 import type { CostTracker } from "../costs/tracker.js";
 import type { ModeManager } from "../mode.js";
 import { listClaudePanes, sendKeys } from "../tmux.js";
+import { readTranscript, summarizeTranscript } from "../transcript/index.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("telegram-bot");
@@ -62,16 +63,47 @@ export class TelegramBot {
         ctx.reply("No active sessions.");
         return;
       }
-      const lines = sessions.map((s) => {
-        const age = Math.round((Date.now() - new Date(s.startedAt).getTime()) / 60000);
-        return [
-          `<b>${escapeHtml(s.label)}</b>`,
-          `  State: ${s.state} | Denials: ${s.denialCount}`,
-          `  CWD: <code>${escapeHtml(s.cwd)}</code>`,
-          `  Last tool: ${s.lastToolName ?? "—"} | Age: ${age}m`,
-        ].join("\n");
+      const buttons = sessions.map((s) =>
+        [Markup.button.callback(s.label, `status:${s.sessionId}`)]
+      );
+      ctx.reply("📊 <b>Active Sessions</b>", {
+        parse_mode: "HTML",
+        ...Markup.inlineKeyboard(buttons),
       });
-      ctx.reply(lines.join("\n\n"), { parse_mode: "HTML" });
+    });
+
+    this.bot.action(/^status:(.+)$/, async (ctx) => {
+      const sessionId = ctx.match[1];
+      const session = this.deps.sessionTracker.get(sessionId);
+      if (!session) {
+        await ctx.answerCbQuery("Session no longer active.");
+        return;
+      }
+      await ctx.answerCbQuery("Loading...");
+
+      const age = Math.round((Date.now() - new Date(session.startedAt).getTime()) / 60000);
+      const lines = [
+        `📊 <b>${escapeHtml(session.label)}</b>`,
+        ``,
+        `<b>State:</b> ${session.state}`,
+        `<b>CWD:</b> <code>${escapeHtml(session.cwd)}</code>`,
+        `<b>Last tool:</b> ${session.lastToolName ?? "—"}`,
+        `<b>Denials:</b> ${session.denialCount}`,
+        `<b>Age:</b> ${age}m`,
+      ];
+
+      if (session.transcriptPath) {
+        try {
+          const excerpt = readTranscript(session.transcriptPath, 15);
+          const summary = await summarizeTranscript(excerpt);
+          lines.push(``, `📋 <b>Summary:</b>`, escapeHtml(summary));
+        } catch { /* omit summary on failure */ }
+      }
+
+      await ctx.reply(lines.join("\n"), {
+        parse_mode: "HTML",
+        reply_parameters: { message_id: ctx.callbackQuery.message?.message_id ?? 0 },
+      });
     });
 
     this.bot.command("send", (ctx) => {

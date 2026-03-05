@@ -39,7 +39,7 @@ All incoming messages are filtered through a middleware that checks `ctx.chat.id
 | Command | Description | Implementation |
 |---|---|---|
 | `/start` | Returns the chat ID | Used for initial setup verification |
-| `/status` | Lists all active sessions | Queries `SessionTracker.getAll()`, formats with state, denial count, CWD, last tool, age |
+| `/status` | Interactive session list | Shows inline keyboard with one button per session; clicking shows details |
 | `/send <window-name> <text>` | Sends text to a Claude session by tmux window name | Resolves window name to pane ID, then calls `sendKeys()` |
 | `/cost` | Shows ClaudeCube's own LLM costs (today + month) | Reads from local `CostTracker.getTotals()` (no admin API key needed) |
 | `/mode` | Toggles or sets operating mode (local/remote) | See [§6.9 Mode Command](#69-mode-command) |
@@ -121,16 +121,14 @@ class ApprovalManager {
 When a tool call needs human approval, a message is sent to Telegram:
 
 ```
-Permission Request
+🔔 Permission Request — <label>
 
-Session: <label>
 Tool: <toolName>
 Reason: <LLM's assessment>
 
 <formatted tool input>
 
 Reply with text to approve + create a policy.
-Use "- add rule: <description>" to also create a safety rule.
 ```
 
 With inline buttons: **[Approve]** | **[Deny]** | **[Details]**
@@ -278,9 +276,9 @@ class NotificationManager {
 
 | Event | Condition | Message |
 |---|---|---|
-| Session start | `config.notifyOnStart` | "Session started\n<label>\nCWD: <cwd>" |
-| Session end | `config.notifyOnComplete` | "Session ended\n<label>" |
-| Denial alert | `denialCount >= config.denialAlertThreshold` | "<label> has been denied N times. Last tool: <tool>. The session may be stuck." |
+| Session start | `config.notifyOnStart` | `▶️ Session started — <label>\nCWD: <cwd>` |
+| Session end | `config.notifyOnComplete` | `⏹️ Session ended — <label>` |
+| Denial alert | `denialCount >= config.denialAlertThreshold` | `⚠️ Denial alert — <label>\nDenied N times. Last tool: <tool>\nThe session may be stuck.` |
 
 ### Error Handling
 
@@ -349,6 +347,44 @@ The `/mode` command controls ClaudeCube's operating mode via the `ModeManager`.
 - In local mode, the bot still processes `/mode` and other commands (`/status`, `/send`, `/cost`, `/help`). Only approval/stop/question messages are suppressed.
 
 See [Local Mode](13-local-mode.md) for full mode behavior.
+
+## 6.10 Interactive /status
+
+The `/status` command displays an inline keyboard with one button per active session. Clicking a button shows session details as a reply to the status message.
+
+### Message
+
+```
+📊 Active Sessions
+
+[session-1-label]
+[session-2-label]
+```
+
+### Session Detail Callback
+
+Callback data: `status:<sessionId>`. On click:
+
+1. Look up the session from `sessionTracker.get(sessionId)`.
+2. If session no longer exists: answer callback with "Session no longer active."
+3. Build a details message with: state, CWD, last tool, denial count, age.
+4. If `transcriptPath` is available: read the last 15 messages and generate an LLM summary (same as the Details button on permission requests).
+5. Send as a reply to the `/status` message.
+
+### Detail Format
+
+```
+📊 <label>
+
+State: <state>
+CWD: <cwd>
+Last tool: <tool>
+Denials: <count>
+Age: <N>m
+
+📋 Summary:
+<LLM-generated summary, if transcript available>
+```
 
 ## Cross-References
 

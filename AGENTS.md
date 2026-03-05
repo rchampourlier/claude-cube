@@ -97,15 +97,24 @@ index.ts (CLI + server startup)
 | `src/server.ts` | — | HTTP server with routes per hook event + `/status` + `/mode` endpoints |
 | `src/hooks/pre-tool-use.ts` | — | PreToolUse handler: rule engine → escalation → audit |
 | `src/hooks/stop.ts` | — | Stop handler: error retry, question escalation |
-| `src/hooks/lifecycle.ts` | — | SessionStart/End/Notification handlers for session tracking |
-| `src/session-tracker.ts` | — | Tracks active sessions and their state |
+| `src/hooks/lifecycle.ts` | — | SessionStart/End/Notification handlers. Uses `ensureRegistered` to merge synthetic→real sessions. |
+| `src/session-tracker.ts` | — | Tracks active sessions and their state. Two-tier: synthetic (from tmux scan) → real (from hooks). |
 | `src/tmux.ts` | — | List Claude panes in tmux, send keys for text injection |
 | `src/installer.ts` | — | Patches `~/.claude/settings.json` to add/remove hooks |
 | `src/rule-engine/` | `engine.ts` | Stateless deny-first rule evaluator. Partitions rules at construction. |
 | `src/escalation/` | `handler.ts` | Two-phase: LLM evaluator first, Telegram fallback if uncertain. |
-| `src/telegram/` | `bot.ts`, `approval.ts` | Bot lifecycle, inline keyboard approval, session status, tmux integration. |
+| `src/telegram/` | `bot.ts`, `approval.ts` | Bot lifecycle, inline keyboard approval, interactive `/status` (inline buttons → session details), question routing, tmux integration. All messages follow the pattern `<emoji> <b>Title</b> — <code>session</code>`. |
 | `src/config/` | `types.ts`, `loader.ts` | Zod schemas for `orchestrator.yaml`. |
 | `hooks/claudecube-hook.sh` | — | Shell script called by Claude Code hooks; curls ClaudeCube server. |
+
+## Session tracking (two-tier model)
+
+`SessionTracker` maintains a map of active sessions. Sessions enter via two paths:
+
+1. **Synthetic sessions** — At startup, `registerFromTmux()` scans all tmux panes running `claude` and creates entries keyed `tmux_%<paneId>`. These provide immediate `/status` visibility but lack real session IDs.
+2. **Real sessions** — When a Claude session fires its first hook (SessionStart or PreToolUse), `ensureRegistered()` is called. It merges with any existing synthetic session matching by pane ID (preferred) or CWD (fallback), transferring the label and metadata.
+
+**Important**: Always use `ensureRegistered()` (not `register()`) when a real session arrives, to avoid duplicate entries. `register()` unconditionally creates a new entry without checking for synthetic matches.
 
 ## Testing (TDD)
 

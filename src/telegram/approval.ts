@@ -298,9 +298,8 @@ export class ApprovalManager {
     const inputSummary = formatToolInput(toolName, toolInput);
     const displayName = context.label ?? context.agentId.slice(0, 12);
     const message = [
-      `🔔 <b>Permission Request</b>`,
+      `🔔 <b>Permission Request</b> — <code>${escapeHtml(displayName)}</code>`,
       ``,
-      `<b>Session:</b> <code>${escapeHtml(displayName)}</code>`,
       `<b>Tool:</b> <code>${escapeHtml(toolName)}</code>`,
       `<b>Reason:</b> ${escapeHtml(context.reason)}`,
       ``,
@@ -361,7 +360,7 @@ export class ApprovalManager {
           resolve({ approved: false, reason: "Telegram approval timed out" });
 
           this.bot
-            .sendMessage(`⏰ Approval request for <code>${escapeHtml(toolName)}</code> timed out (denied).`, "HTML")
+            .sendMessage(`⏰ <b>Timed out</b> — <code>${escapeHtml(toolName)}</code> (denied)`, "HTML")
             .catch(() => {});
         }
       }, this.timeoutMs);

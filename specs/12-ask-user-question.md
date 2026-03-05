@@ -38,8 +38,9 @@ PreToolUse input received
 ### Single-Select
 
 ```
-❓ Question — <header>
+❓ Question — <session label>
 
+<header>
 <question text>
 
 Tap an option or reply with text for a custom answer.
@@ -49,13 +50,14 @@ Tap an option or reply with text for a custom answer.
 [option 3 label]
 ```
 
-One inline button per option, each on its own row.
+One inline button per option, each on its own row. The session label appears in the title line; the header moves to the body.
 
 ### Multi-Select
 
 ```
-❓ Question — <header>
+❓ Question — <session label>
 
+<header>
 <question text>
 
 Toggle options, then tap Done.

@@ -85,8 +85,9 @@ export class QuestionHandler {
     const counterSuffix = total > 1 ? ` (${index + 1}/${total})` : "";
 
     const messageParts = [
-      `❓ <b>Question</b> — ${escapeHtml(headerLabel)}${counterSuffix}`,
+      `❓ <b>Question</b> — <code>${escapeHtml(context.label)}</code>`,
       ``,
+      `<b>${escapeHtml(headerLabel)}</b>${counterSuffix}`,
       escapeHtml(question.question),
       ``,
     ];
@@ -95,10 +96,6 @@ export class QuestionHandler {
       messageParts.push(`<i>Toggle options, then tap Done. Reply with text for a custom answer.</i>`);
     } else {
       messageParts.push(`<i>Tap an option or reply with text for a custom answer.</i>`);
-    }
-
-    if (context.label) {
-      messageParts.push(``, `<b>Session:</b> <code>${escapeHtml(context.label)}</code>`);
     }
 
     const message = messageParts.join("\n");
