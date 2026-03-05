@@ -94,13 +94,22 @@ Every tool call in a monitored Claude session goes through this flow:
 
 All decisions are logged to `.claudecube/audit/`.
 
+### Local/remote mode
+
+ClaudeCube supports two operating modes, toggled at runtime:
+
+- **Remote** (default): Full Telegram oversight — escalations, stop decisions, and questions flow through Telegram.
+- **Local**: Telegram disabled for decisions. Everything passthroughs to the terminal. The LLM evaluator still runs and auto-approves when confident.
+
+Switch modes via Telegram (`/mode`), HTTP endpoint (`POST /mode`), or configure idle-based auto-detection (macOS).
+
 ### Stop handler
 
 When a Claude session stops, ClaudeCube evaluates whether to force-continue:
 
 - **Error detected** → automatically retries with "try a different approach" (up to `maxRetries`)
-- **Question detected** → escalates to Telegram: "Agent stopped. Force continue?"
-- **Normal completion** → lets the session stop
+- **All stops (after retries)** → transcript analysis + Telegram escalation (remote mode only)
+- **Local mode** → lets the session stop after retry exhaustion
 
 ### Default rules
 
@@ -183,7 +192,8 @@ Once the bot is running, you can control sessions from your phone:
 |---------|-------------|
 | `/status` | List all active sessions with state, denials, and cwd |
 | `/panes` | List Claude panes in tmux |
-| `/send <pane-id> <text>` | Send text to a specific tmux pane |
+| `/send <window> <text>` | Send text to a tmux pane by window name |
+| `/mode [local\|remote]` | Toggle or set operating mode |
 | `/cost` | Show Anthropic API costs (today + month-to-date) |
 | `/help` | List all available commands |
 | Free text | Forwarded to the first Claude pane via tmux |
@@ -207,6 +217,12 @@ stop:
   retryOnError: true
   maxRetries: 2
   escalateToTelegram: true
+
+mode:
+  default: "remote"          # startup mode: "remote" or "local"
+  autoDetect: false           # macOS idle-based auto-switching
+  idleThresholdSeconds: 300   # idle time before switching to remote
+  pollIntervalSeconds: 60     # how often to check idle time
 ```
 
 ## Project structure
@@ -214,7 +230,8 @@ stop:
 ```
 src/
   index.ts                  # CLI entry point — server startup + --install/--uninstall
-  server.ts                 # HTTP server with routes per hook event
+  server.ts                 # HTTP server with routes per hook event + /mode endpoint
+  mode.ts                   # Runtime local/remote mode state (ModeManager)
   session-tracker.ts        # Tracks active Claude sessions and their state
   tmux.ts                   # List Claude panes, send keys for text injection
   installer.ts              # Patches ~/.claude/settings.json with hooks

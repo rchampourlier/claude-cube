@@ -34,17 +34,30 @@ ClaudeCube is a **hooks-based orchestrator**. It does NOT spawn agents — inste
 3. ClaudeCube evaluates rules, optionally escalates to LLM/Telegram, and returns decisions
 4. The shell script outputs the response back to Claude Code
 
+### Operating mode (local/remote)
+
+ClaudeCube has two runtime modes controlled by `ModeManager` (`src/mode.ts`):
+
+- **Remote** (default): Full Telegram oversight — escalations, stop decisions, and questions flow through Telegram.
+- **Local**: Telegram disabled for decisions. Escalations, stop decisions, and questions passthrough (`{}`) to the terminal. The LLM evaluator still runs and auto-approves when confident.
+
+Switching: Telegram `/mode` command, `GET/POST /mode` HTTP endpoint, or `mode.autoDetect` (macOS idle detection). See `specs/13-local-mode.md`.
+
 ### Permission flow (the core loop)
 
 ```
 Claude Code fires PreToolUse hook
   → Shell script → HTTP POST /hooks/PreToolUse
+    → AskUserQuestion? → local mode → passthrough {}
+                        → remote mode → Telegram question routing
     → RuleEngine.evaluate(toolName, toolInput)
       → DENY rules checked first → block immediately
       → ALLOW rules checked next → approve immediately
       → No match → EscalationHandler
-        → LlmEvaluator (Haiku) → if confident, decide
-                                 → if uncertain, Telegram approval
+        → LlmEvaluator (Haiku) → if confident allow → approve
+                                 → if uncertain/deny:
+                                   → local mode → passthrough {}
+                                   → remote mode → Telegram approval
 ```
 
 ### Stop handler flow
@@ -54,22 +67,24 @@ Claude Code fires Stop hook
   → Shell script → HTTP POST /hooks/Stop
     → Check stop_hook_active (prevent loops)
     → Detect error pattern in last_assistant_message → force retry
-    → Detect question pattern → escalate to Telegram
-    → Otherwise → let stop
+    → local mode → let stop (passthrough)
+    → remote mode → Transcript analysis + Telegram escalation
 ```
 
 ### Module dependency graph
 
 ```
 index.ts (CLI + server startup)
-  → server.ts (HTTP routes)
+  → server.ts (HTTP routes: /hooks/*, /status, /mode)
     → hooks/pre-tool-use.ts → RuleEngine → rules.yaml
                              → EscalationHandler → LlmEvaluator (Anthropic API)
-                                                 → ApprovalManager (Telegram)
-    → hooks/stop.ts → StopConfig + ApprovalManager
+                             |                   → ApprovalManager (Telegram)
+                             → ModeManager (local/remote mode check)
+    → hooks/stop.ts → StopConfig + ApprovalManager + ModeManager
     → hooks/lifecycle.ts → SessionTracker + NotificationManager
+  → mode.ts (runtime local/remote mode state)
   → session-tracker.ts (active session state)
-  → telegram/ → Telegraf bot + approval + notifications
+  → telegram/ → Telegraf bot + approval + notifications + /mode command
   → tmux.ts → list panes, send keys
   → installer.ts → patch ~/.claude/settings.json
 ```
@@ -78,7 +93,8 @@ index.ts (CLI + server startup)
 
 | Module | Entry | Responsibility |
 |--------|-------|----------------|
-| `src/server.ts` | — | HTTP server with routes per hook event + `/status` endpoint |
+| `src/mode.ts` | — | Runtime local/remote mode state (`ModeManager`) |
+| `src/server.ts` | — | HTTP server with routes per hook event + `/status` + `/mode` endpoints |
 | `src/hooks/pre-tool-use.ts` | — | PreToolUse handler: rule engine → escalation → audit |
 | `src/hooks/stop.ts` | — | Stop handler: error retry, question escalation |
 | `src/hooks/lifecycle.ts` | — | SessionStart/End/Notification handlers for session tracking |
