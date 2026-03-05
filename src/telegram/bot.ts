@@ -3,7 +3,7 @@ import type { SessionTracker } from "../session-tracker.js";
 import type { CostTracker } from "../costs/tracker.js";
 import type { ModeManager } from "../mode.js";
 import { listClaudePanes, sendKeys } from "../tmux.js";
-import { readTranscript, summarizeTranscript } from "../transcript/index.js";
+import { readTranscript, summarizeTranscript, formatRecentActivity } from "../transcript/index.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("telegram-bot");
@@ -81,29 +81,41 @@ export class TelegramBot {
       }
       await ctx.answerCbQuery("Loading...");
 
-      const age = Math.round((Date.now() - new Date(session.startedAt).getTime()) / 60000);
-      const lines = [
-        `📊 <b>${escapeHtml(session.label)}</b>`,
-        ``,
-        `<b>State:</b> ${session.state}`,
-        `<b>CWD:</b> <code>${escapeHtml(session.cwd)}</code>`,
-        `<b>Last tool:</b> ${session.lastToolName ?? "—"}`,
-        `<b>Denials:</b> ${session.denialCount}`,
-        `<b>Age:</b> ${age}m`,
-      ];
-
-      if (session.transcriptPath) {
-        try {
-          const excerpt = readTranscript(session.transcriptPath, 15);
-          const summary = await summarizeTranscript(excerpt);
-          lines.push(``, `📋 <b>Summary:</b>`, escapeHtml(summary));
-        } catch { /* omit summary on failure */ }
+      if (!session.transcriptPath) {
+        await ctx.reply("No transcript available for this session.", {
+          reply_parameters: { message_id: ctx.callbackQuery.message?.message_id ?? 0 },
+        });
+        return;
       }
 
-      await ctx.reply(lines.join("\n"), {
-        parse_mode: "HTML",
-        reply_parameters: { message_id: ctx.callbackQuery.message?.message_id ?? 0 },
-      });
+      try {
+        const excerpt = readTranscript(session.transcriptPath, 15);
+        let summary: string;
+        try {
+          summary = await summarizeTranscript(excerpt);
+        } catch {
+          summary = "(Summary unavailable)";
+        }
+        const recentActivity = formatRecentActivity(excerpt);
+
+        const lines = [
+          `📋 <b>Session context:</b> <code>${escapeHtml(session.label)}</code>`,
+          ``,
+          escapeHtml(summary),
+          ``,
+          `<b>Recent activity:</b>`,
+          `<pre>${escapeHtml(recentActivity || "(no activity)")}</pre>`,
+        ];
+
+        await ctx.reply(lines.join("\n"), {
+          parse_mode: "HTML",
+          reply_parameters: { message_id: ctx.callbackQuery.message?.message_id ?? 0 },
+        });
+      } catch {
+        await ctx.reply("Failed to fetch session details.", {
+          reply_parameters: { message_id: ctx.callbackQuery.message?.message_id ?? 0 },
+        });
+      }
     });
 
     this.bot.command("send", (ctx) => {

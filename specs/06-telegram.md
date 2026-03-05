@@ -367,23 +367,21 @@ Callback data: `status:<sessionId>`. On click:
 
 1. Look up the session from `sessionTracker.get(sessionId)`.
 2. If session no longer exists: answer callback with "Session no longer active."
-3. Build a details message with: state, CWD, last tool, denial count, age.
-4. If `transcriptPath` is available: read the last 15 messages and generate an LLM summary (same as the Details button on permission requests).
+3. If no `transcriptPath`: reply with "No transcript available for this session."
+4. Read the last 15 messages and generate an LLM summary + recent activity (same format as the Details button on permission requests).
 5. Send as a reply to the `/status` message.
 
 ### Detail Format
 
 ```
-📊 <label>
+📋 Session context: <label>
 
-State: <state>
-CWD: <cwd>
-Last tool: <tool>
-Denials: <count>
-Age: <N>m
+<LLM-generated summary>
 
-📋 Summary:
-<LLM-generated summary, if transcript available>
+Recent activity:
+  Agent: <last assistant text, truncated>
+    Tools: Edit, Bash
+  User: <last user text, truncated>
 ```
 
 ## Cross-References
