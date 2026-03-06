@@ -30,7 +30,7 @@ export async function summarizeTranscript(
   const conversationText = buildConversationText(excerpt);
 
   try {
-    const client = new Anthropic();
+    const client = new Anthropic({ maxRetries: 5 });
 
     log.info("Summarizing transcript", { messageCount: excerpt.messages.length, model });
 

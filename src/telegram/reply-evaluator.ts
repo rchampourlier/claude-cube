@@ -41,7 +41,7 @@ export class ReplyEvaluator {
     private model: string = "claude-haiku-4-5-20251001",
     private costTracker: CostTracker | null = null,
   ) {
-    this.client = new Anthropic();
+    this.client = new Anthropic({ maxRetries: 5 });
   }
 
   async evaluateReply(

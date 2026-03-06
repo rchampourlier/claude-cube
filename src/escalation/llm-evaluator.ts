@@ -43,7 +43,7 @@ export class LlmEvaluator {
     private policyStore: PolicyStore | null = null,
     private costTracker: CostTracker | null = null,
   ) {
-    this.client = new Anthropic();
+    this.client = new Anthropic({ maxRetries: 5 });
   }
 
   async evaluate(
