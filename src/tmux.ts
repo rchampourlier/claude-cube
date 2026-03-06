@@ -59,6 +59,20 @@ export function findPaneForCwd(cwd: string, paneId?: string | null): string | nu
   return match?.paneId ?? null;
 }
 
+export function createWindow(cwd: string, name: string): string {
+  try {
+    const paneId = execSync(
+      `tmux new-window -c ${JSON.stringify(cwd)} -n ${JSON.stringify(name)} -P -F '#{pane_id}'`,
+      { encoding: "utf-8", timeout: 5000 },
+    ).trim();
+    log.info("Created tmux window", { cwd, name, paneId });
+    return paneId;
+  } catch (e) {
+    log.error("Failed to create tmux window", { cwd, name, error: String(e) });
+    throw new Error(`Failed to create tmux window: ${e}`);
+  }
+}
+
 export function sendKeys(paneTarget: string, text: string): void {
   try {
     // Use -l for literal text (no key name interpretation), then send Enter separately

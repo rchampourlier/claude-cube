@@ -1,8 +1,10 @@
+import { basename } from "node:path";
 import { Telegraf, Markup } from "telegraf";
 import type { SessionTracker } from "../session-tracker.js";
 import type { CostTracker } from "../costs/tracker.js";
 import type { ModeManager } from "../mode.js";
-import { listClaudePanes, sendKeys } from "../tmux.js";
+import { listClaudePanes, sendKeys, createWindow } from "../tmux.js";
+import { resolvePath } from "../spawn.js";
 import { readTranscript, summarizeTranscript, formatRecentActivity } from "../transcript/index.js";
 import { createLogger } from "../util/logger.js";
 
@@ -12,6 +14,7 @@ const COMMANDS = [
   { command: "start", description: "Show chat ID (for initial setup)" },
   { command: "status", description: "List all active Claude sessions" },
   { command: "send", description: "Send text to a tmux pane", usage: "/send <window> <text>" },
+  { command: "new", description: "Spawn a new Claude agent", usage: "/new <directory> [prompt]" },
   { command: "mode", description: "Toggle or set operating mode", usage: "/mode [local|remote]" },
   { command: "cost", description: "Show ClaudeCube's own LLM costs (today + month)" },
   { command: "help", description: "Show this help message" },
@@ -21,13 +24,20 @@ export interface TelegramBotDeps {
   sessionTracker: SessionTracker;
   costTracker?: CostTracker;
   modeManager?: ModeManager;
+  spawnSearchPaths?: string[];
   onFreeText?: (chatId: number, text: string) => void;
+}
+
+interface PendingSpawn {
+  matches: string[];
+  prompt?: string;
 }
 
 export class TelegramBot {
   private bot: Telegraf;
   private chatId: string;
   private started = false;
+  private pendingSpawns = new Map<string, PendingSpawn>();
 
   constructor(
     token: string,
@@ -157,6 +167,52 @@ export class TelegramBot {
       }
     });
 
+    this.bot.command("new", (ctx) => {
+      const args = ctx.message.text.split(/\s+/).slice(1);
+      if (args.length === 0) {
+        ctx.reply("Usage: /new <directory> [prompt]");
+        return;
+      }
+      const pathCandidate = args[0];
+      const prompt = args.slice(1).join(" ") || undefined;
+      const searchPaths = this.deps.spawnSearchPaths ?? [];
+      const result = resolvePath(pathCandidate, searchPaths);
+
+      switch (result.kind) {
+        case "resolved":
+          this.doSpawn(ctx, result.path, prompt);
+          break;
+        case "ambiguous": {
+          const reqId = String(Date.now());
+          this.pendingSpawns.set(reqId, { matches: result.matches, prompt });
+          const buttons = result.matches.map((m, i) =>
+            [Markup.button.callback(m.replace(process.env["HOME"] ?? "", "~"), `spawn:${reqId}:${i}`)]
+          );
+          ctx.reply(`📂 Multiple matches for "${escapeHtml(pathCandidate)}":`, {
+            parse_mode: "HTML",
+            ...Markup.inlineKeyboard(buttons),
+          });
+          break;
+        }
+        case "error":
+          ctx.reply(result.message);
+          break;
+      }
+    });
+
+    this.bot.action(/^spawn:(.+):(\d+)$/, async (ctx) => {
+      const reqId = ctx.match[1];
+      const index = parseInt(ctx.match[2], 10);
+      const pending = this.pendingSpawns.get(reqId);
+      if (!pending || index >= pending.matches.length) {
+        await ctx.answerCbQuery("Spawn request expired.");
+        return;
+      }
+      this.pendingSpawns.delete(reqId);
+      await ctx.answerCbQuery("Spawning...");
+      this.doSpawn(ctx, pending.matches[index], pending.prompt);
+    });
+
     this.bot.command("cost", (ctx) => {
       const tracker = this.deps.costTracker;
       if (!tracker) {
@@ -229,6 +285,28 @@ export class TelegramBot {
     });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async doSpawn(ctx: { reply: (...args: any[]) => any }, resolvedPath: string, prompt?: string): Promise<void> {
+    const name = basename(resolvedPath);
+    try {
+      const paneId = createWindow(resolvedPath, name);
+      // Brief delay for shell initialization
+      await new Promise((r) => setTimeout(r, 500));
+      const command = prompt ? `claude "${escapePrompt(prompt)}"` : "claude";
+      sendKeys(paneId, command);
+      const lines = [
+        `🚀 Agent started — <b>${escapeHtml(name)}</b>`,
+        `CWD: <code>${escapeHtml(resolvedPath)}</code>`,
+      ];
+      if (prompt) lines.push(`Prompt: ${escapeHtml(prompt)}`);
+      lines.push("", `Use /send ${escapeHtml(name)} &lt;text&gt; to send messages.`);
+      ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
+    } catch (e) {
+      log.error("Failed to spawn agent", { resolvedPath, error: String(e) });
+      ctx.reply(`Failed to spawn agent: ${e}`);
+    }
+  }
+
   async start(): Promise<void> {
     if (this.started) return;
     log.info("Starting Telegram bot (long-polling)");
@@ -266,4 +344,8 @@ export class TelegramBot {
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function escapePrompt(text: string): string {
+  return text.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/`/g, "\\`").replace(/\$/g, "\\$");
 }

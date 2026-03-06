@@ -22,6 +22,11 @@ stop:
   # When uncertain, ask via Telegram
   escalateToTelegram: true
 
+spawn:
+  searchPaths:
+    - ~/dev
+    - ~/dev+rc10r
+
 mode:
   # Startup mode: "remote" (full Telegram oversight) or "local" (passthrough)
   default: "remote"

@@ -126,6 +126,7 @@ async function main(): Promise<void> {
       sessionTracker,
       costTracker,
       modeManager,
+      spawnSearchPaths: config.spawn.searchPaths,
     });
     approvalManager = new ApprovalManager(
       telegramBot,

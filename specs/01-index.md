@@ -91,6 +91,7 @@ On startup:
 | 12 | [AskUserQuestion Routing](12-ask-user-question.md) | Intercept agent questions, route to Telegram, deliver answers via block reason |
 | 13 | [Local Mode](13-local-mode.md) | Local/remote mode toggle, passthrough behavior, switching mechanisms |
 | 14 | [Notifications](14-notifications.md) | macOS notifications, tmux window alerts, alert lifecycle |
+| 15 | [Spawn Agents](15-spawn-agents.md) | `/new` command: spawn Claude agents in new tmux windows from Telegram |
 
 ## Supplementary Documents
 

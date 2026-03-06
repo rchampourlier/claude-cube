@@ -31,11 +31,16 @@ export const ModeConfigSchema = z.object({
   pollIntervalSeconds: z.number().int().positive().default(60),
 });
 
+export const SpawnConfigSchema = z.object({
+  searchPaths: z.array(z.string()).default([]),
+});
+
 export const OrchestratorConfigSchema = z.object({
   server: ServerConfigSchema,
   escalation: EscalationConfigSchema,
   telegram: TelegramConfigSchema,
   stop: StopConfigSchema,
+  spawn: SpawnConfigSchema,
   mode: ModeConfigSchema,
 });
 
@@ -44,4 +49,5 @@ export type EscalationConfig = z.infer<typeof EscalationConfigSchema>;
 export type TelegramConfig = z.infer<typeof TelegramConfigSchema>;
 export type StopConfig = z.infer<typeof StopConfigSchema>;
 export type ModeConfig = z.infer<typeof ModeConfigSchema>;
+export type SpawnConfig = z.infer<typeof SpawnConfigSchema>;
 export type OrchestratorConfig = z.infer<typeof OrchestratorConfigSchema>;
