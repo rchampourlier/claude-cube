@@ -4,6 +4,7 @@ import type { PolicyStore } from "../policies/store.js";
 import type { CostTracker } from "../costs/tracker.js";
 import type { EscalationConfig } from "../config/types.js";
 import type { ModeManager } from "../mode.js";
+import { alertUser, clearAlert } from "../notify.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("escalation-handler");
@@ -72,6 +73,7 @@ export class EscalationHandler {
     // Local mode: passthrough instead of Telegram
     if (this.modeManager?.isLocal()) {
       log.info("Local mode — passthrough to terminal", { toolName }, label);
+      alertUser({ title: "Permission needed in terminal", message: toolName, paneId: context.paneId });
       return {
         allowed: false,
         reason: `LLM uncertain: ${llmResult.reason} (local mode passthrough)`,
@@ -89,6 +91,7 @@ export class EscalationHandler {
     }
 
     log.info("LLM uncertain, escalating to Telegram", { toolName }, label);
+    alertUser({ title: "Permission needed", message: toolName, paneId: context.paneId });
     const telegramResult: ApprovalResult = await this.approvalManager.requestApproval(
       toolName,
       toolInput,
@@ -101,6 +104,7 @@ export class EscalationHandler {
         reason: `LLM uncertain: ${llmResult.reason}`,
       },
     );
+    clearAlert(context.paneId);
 
     // If the human replied with policy text, save it
     if (telegramResult.policyText && this.policyStore) {

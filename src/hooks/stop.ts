@@ -3,6 +3,7 @@ import type { SessionTracker } from "../session-tracker.js";
 import type { ApprovalManager } from "../telegram/approval.js";
 import type { ModeManager } from "../mode.js";
 import { readTranscript, extractRecentTools, summarizeTranscript } from "../transcript/index.js";
+import { alertUser, clearAlert } from "../notify.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("stop-hook");
@@ -71,6 +72,7 @@ export function createStopHandler(
     // Local mode: skip Telegram, let stop
     if (modeManager?.isLocal()) {
       log.info("Local mode — letting stop through", undefined, label);
+      alertUser({ title: "Claude stopped", message: label ?? "session", paneId: sessionTracker.getPaneId(sessionId) });
       retryCount.delete(sessionId);
       return {};
     }
@@ -98,6 +100,7 @@ export function createStopHandler(
         }
       }
 
+      alertUser({ title: "Claude stopped", message: label ?? "session", paneId: sessionTracker.getPaneId(sessionId) });
       const result = await approvalManager.requestStopDecision(
         sessionId,
         lastMessage,
@@ -106,6 +109,7 @@ export function createStopHandler(
         sessionTracker.getPaneId(sessionId),
         { summary, recentTools },
       );
+      clearAlert(sessionTracker.getPaneId(sessionId));
 
       if (result.approved) {
         if (result.policyText) {

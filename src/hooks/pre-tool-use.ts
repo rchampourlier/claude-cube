@@ -4,6 +4,7 @@ import type { AuditLog } from "./audit-hook.js";
 import type { SessionTracker } from "../session-tracker.js";
 import type { QuestionHandler } from "../telegram/question-handler.js";
 import type { ModeManager } from "../mode.js";
+import { alertUser, clearAlert } from "../notify.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("pre-tool-use");
@@ -44,6 +45,7 @@ export function createPreToolUseHandler(
 
     sessionTracker.ensureRegistered(sessionId, input.cwd, input.transcript_path, input.tmux_pane);
     sessionTracker.updateToolUse(sessionId, toolName);
+    clearAlert(sessionTracker.getPaneId(sessionId));
     sessionTracker.updateState(sessionId, "permission_pending");
 
     // Step 0: AskUserQuestion early intercept (before rule engine)
@@ -62,10 +64,12 @@ export function createPreToolUseHandler(
       }
 
       try {
+        alertUser({ title: "Question from Claude", message: (toolInput.question as string)?.slice(0, 100) ?? "Question", paneId: sessionTracker.getPaneId(sessionId) });
         const answer = await questionHandler.handleQuestion(toolInput, {
           sessionId,
           label: label ?? sessionId.slice(0, 12),
         });
+        clearAlert(sessionTracker.getPaneId(sessionId));
 
         auditLog.log({
           sessionId,

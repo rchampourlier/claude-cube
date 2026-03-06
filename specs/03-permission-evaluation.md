@@ -160,3 +160,4 @@ The log directory is created recursively at construction time. The file name is 
 - The escalation pipeline (invoked in step 3) is described in [LLM-Based Evaluation](04-llm-evaluation.md).
 - Session tracking is described in [Session Management](07-session-management.md).
 - The Telegram approval flow (part of escalation) is described in [Telegram Integration](06-telegram.md).
+- When escalating to Telegram or passthrough, `alertUser()` triggers a macOS notification and tmux 🔔 prefix; cleared after decision. See [Notifications](14-notifications.md).

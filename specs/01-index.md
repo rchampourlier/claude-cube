@@ -13,6 +13,7 @@
 - Policy learning: human decisions are saved and fed back to the LLM evaluator
 - Startup session discovery: scans tmux for existing Claude sessions on startup
 - Local/remote operating mode: toggle Telegram oversight on/off at runtime for local development
+- macOS notifications for user attention when Claude is waiting for input
 - Fail-open design: if ClaudeCube is unreachable, Claude Code continues normally
 
 **Version:** 0.1.0 | **Runtime:** Node.js >= 22 (ESM) | **Language:** TypeScript (strict)
@@ -89,6 +90,7 @@ On startup:
 | 11 | [Transcript Analysis](11-transcript-analysis.md) | Transcript reader, LLM summarizer, integration with approval and stop flows |
 | 12 | [AskUserQuestion Routing](12-ask-user-question.md) | Intercept agent questions, route to Telegram, deliver answers via block reason |
 | 13 | [Local Mode](13-local-mode.md) | Local/remote mode toggle, passthrough behavior, switching mechanisms |
+| 14 | [Notifications](14-notifications.md) | macOS notifications, tmux window alerts, alert lifecycle |
 
 ## Supplementary Documents
 

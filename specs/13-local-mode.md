@@ -38,6 +38,9 @@ Not persisted. Not serialized. Resets to default on server restart.
 | AskUserQuestion | Route to Telegram | Passthrough `{}` to terminal |
 | Telegram bot | Active | Stays running (for `/mode` command) but sends no messages |
 | Audit logging | Logged | Logged with `decidedBy: "passthrough"` |
+| Notifications | macOS + 🔔 (cleared after decision) | macOS + 🔔 (cleared on next tool call) |
+
+**Note on local mode notifications**: Even in local mode, `alertUser()` fires for escalation and stop events — the user needs to look at the terminal. The tmux 🔔 prefix is cleared on the next tool call (safety-net in `PreToolUse`). See [Notifications](14-notifications.md).
 
 ### Key Points
 

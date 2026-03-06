@@ -1,5 +1,6 @@
 import type { SessionTracker } from "../session-tracker.js";
 import type { NotificationManager } from "../telegram/notifications.js";
+import { clearAlert } from "../notify.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("lifecycle-hook");
@@ -47,6 +48,7 @@ export function createSessionEndHandler(
   return async (input: SessionEndInput): Promise<Record<string, never>> => {
     const { session_id: sessionId } = input;
     log.info("SessionEnd", { sessionId });
+    clearAlert(sessionTracker.getPaneId(sessionId));
     sessionTracker.deregister(sessionId);
     await notifications?.sessionEnded(sessionId);
     return {};

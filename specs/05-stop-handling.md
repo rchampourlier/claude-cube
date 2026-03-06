@@ -186,3 +186,4 @@ stop:
 - Telegram stop decisions use the `ApprovalManager` described in [Telegram Integration](06-telegram.md).
 - Transcript analysis (reader, summarizer, graceful degradation) is described in [Transcript Analysis](11-transcript-analysis.md).
 - Configuration is described in [Configuration](09-configuration.md).
+- Stop escalation (both remote and local mode) triggers `alertUser()` for macOS notification + tmux 🔔; cleared after decision. See [Notifications](14-notifications.md).

@@ -45,7 +45,7 @@ export function resolveLabel(cwd: string, paneId?: string | null): string | null
     ? panes.find((p) => p.paneId === paneId)
     : panes.find((p) => p.paneCwd === cwd);
   if (!match) return null;
-  return match.windowName;
+  return match.windowName.replace(/^🔔\s*/, "");
 }
 
 /**

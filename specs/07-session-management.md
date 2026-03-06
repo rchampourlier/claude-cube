@@ -116,6 +116,10 @@ Sends text to a specific tmux pane, simulating keyboard input followed by Enter.
 
 **Throws**: `Error` if the tmux command fails.
 
+### Label Stripping
+
+`resolveLabel()` strips any 🔔 prefix from the window name before returning. This ensures session labels used in Telegram messages, `/status`, and internal tracking are not polluted by the notification emoji. See [Notifications](14-notifications.md).
+
 ### Constraints
 
 - All tmux operations are synchronous (`execSync` with 5-second timeout).
@@ -161,6 +165,7 @@ createSessionStartHandler(sessionTracker, notifications)
 
 ```typescript
 createSessionEndHandler(sessionTracker, notifications)
+  --> clearAlert(paneId) to clean up tmux window name
   --> deregister session from tracker
   --> send Telegram notification (if configured)
   --> return {}
