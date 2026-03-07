@@ -78,7 +78,7 @@ When multiple directories match, an inline keyboard is shown:
 📂 Multiple matches for "api":
 
 [~/dev/api-server]
-[~/dev+rc10r/api-gateway]
+[~/projects/api-gateway]
 ```
 
 Each button's callback data encodes the full resolved path and the original prompt. Tapping a button proceeds with the spawn.
@@ -89,7 +89,7 @@ When fuzzy matches are returned (no exact match), they're shown the same way but
 📂 No exact match for "api". Did you mean:
 
 [~/dev/api-server]
-[~/dev+rc10r/api-gateway]
+[~/projects/api-gateway]
 ```
 
 ## 15.3 Tmux Window Creation

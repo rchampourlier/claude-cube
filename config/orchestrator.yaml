@@ -24,8 +24,7 @@ stop:
 
 spawn:
   searchPaths:
-    - ~/dev
-    - ~/dev+rc10r
+    - ~/projects
 
 mode:
   # Startup mode: "remote" (full Telegram oversight) or "local" (passthrough)

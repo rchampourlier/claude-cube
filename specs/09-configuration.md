@@ -1,10 +1,12 @@
 # 9. Configuration
 
-ClaudeCube is configured through two YAML files, environment variables, and CLI flags.
+ClaudeCube is configured through YAML files, environment variables, and CLI flags.
+
+Runtime config lives in `~/.config/claude-cube/`. On first startup, template files from the repo's `config/` directory are copied there if missing. Users edit the files under `~/.config/claude-cube/`; the repo's `config/` files serve only as defaults.
 
 ## 9.1 Orchestrator Configuration
 
-### File: `config/orchestrator.yaml`
+### File: `~/.config/claude-cube/orchestrator.yaml`
 
 Controls the server port, escalation behavior, Telegram settings, and stop handler.
 
@@ -93,7 +95,7 @@ Synchronous: reads YAML, parses, validates with Zod (applying defaults for missi
 
 ## 9.2 Safety Rules Configuration
 
-### File: `config/rules.yaml`
+### File: `~/.config/claude-cube/rules.yaml`
 
 See [Safety Rule System](02-safety-rules.md) for the complete rule definition language and default rules.
 
@@ -116,15 +118,15 @@ Synchronous: reads YAML, parses, validates with Zod, pre-validates all regex pat
 
 Telegram is optional. Without both `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, the Telegram bot, approval manager, and notification manager are all `null`. The LLM evaluator makes all escalation decisions autonomously (and denials default to blocked since there is no Telegram fallback).
 
-The `.env` file in the project root contains 1Password secret references (`op://...`) that are resolved at runtime via the 1Password CLI.
+A `.env` file in the project root (gitignored) can be used to set environment variables.
 
 ## 9.4 CLI Flags
 
 | Flag | Short | Type | Default | Description |
 |---|---|---|---|---|
 | `--port` | | string | from config | Override server port |
-| `--config` | `-c` | string | `config/orchestrator.yaml` | Path to orchestrator config |
-| `--rules` | `-r` | string | `config/rules.yaml` | Path to safety rules |
+| `--config` | `-c` | string | `~/.config/claude-cube/orchestrator.yaml` | Path to orchestrator config |
+| `--rules` | `-r` | string | `~/.config/claude-cube/rules.yaml` | Path to safety rules |
 | `--verbose` | `-v` | boolean | false | Set log level to "debug" |
 | `--install` | | boolean | | Install hooks (standalone command) |
 | `--uninstall` | | boolean | | Remove hooks (standalone command) |
@@ -137,7 +139,7 @@ CLI flags are parsed using Node.js `parseArgs` from `node:util`.
 
 For the server port:
 1. `--port` CLI flag (highest priority)
-2. `server.port` in `config/orchestrator.yaml`
+2. `server.port` in `~/.config/claude-cube/orchestrator.yaml`
 3. Default value: `7080`
 
 ## Cross-References

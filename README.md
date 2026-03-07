@@ -78,8 +78,8 @@ This starts the HTTP server on port 7080 and the Telegram bot. Then open `claude
 | `--uninstall` | | Remove ClaudeCube hooks from settings | |
 | `--status` | | Query running server for active sessions | |
 | `--port` | | Custom server port | `7080` |
-| `--config` | `-c` | Path to orchestrator config | `config/orchestrator.yaml` |
-| `--rules` | `-r` | Path to safety rules | `config/rules.yaml` |
+| `--config` | `-c` | Path to orchestrator config | `~/.config/claude-cube/orchestrator.yaml` |
+| `--rules` | `-r` | Path to safety rules | `~/.config/claude-cube/rules.yaml` |
 | `--verbose` | `-v` | Enable debug logging | off |
 
 ## How permissions work
@@ -113,7 +113,7 @@ When a Claude session stops, ClaudeCube evaluates whether to force-continue:
 
 ### Default rules
 
-Out of the box, `config/rules.yaml` includes:
+Out of the box, the default `rules.yaml` includes:
 
 **Blocked** — destructive commands (`rm -rf /`), force push, edits to `.env`/`.pem`/credentials files
 
@@ -123,7 +123,7 @@ Out of the box, `config/rules.yaml` includes:
 
 ### Customizing rules
 
-Edit `config/rules.yaml`. Each rule has:
+Edit `~/.config/claude-cube/rules.yaml`. Each rule has:
 
 ```yaml
 - name: "Human-readable name"
@@ -157,7 +157,7 @@ This creates a policy scoped to the `Bash` tool. Next time a similar `npm instal
 
 #### Policies vs rules
 
-| | Rules (`config/rules.yaml`) | Policies (`config/policies.yaml` + `policies.local.yaml`) |
+| | Rules (`rules.yaml`) | Policies (`policies.yaml` + `policies.local.yaml`) |
 |---|---|---|
 | **Type** | Deterministic (regexp/glob/literal) | Advisory (free-text for LLM) |
 | **Speed** | Instant — no API call | Requires LLM evaluation |
@@ -168,10 +168,10 @@ This creates a policy scoped to the `Bash` tool. Next time a similar `npm instal
 #### Managing policies
 
 - **Create**: Reply with text to any Telegram approval request (saved to `config/policies.local.yaml`)
-- **View**: Open `config/policies.yaml` (shared) and `config/policies.local.yaml` (local, gitignored)
+- **View**: Open `~/.config/claude-cube/policies.yaml` and `~/.config/claude-cube/policies.local.yaml`
 - **Delete**: Edit the relevant policies file directly (remove entries)
 - **Consolidate**: Run `/consolidate-policies` in Claude Code to analyze and merge redundant policies
-- **Promote to rule**: When a policy is stable, convert it to a hard rule in `config/rules.yaml` for instant, deterministic evaluation. See [Policy-to-Rule Promotion](specs/08-policy-learning.md#85-policy-to-rule-promotion).
+- **Promote to rule**: When a policy is stable, convert it to a hard rule in `rules.yaml` for instant, deterministic evaluation. See [Policy-to-Rule Promotion](specs/08-policy-learning.md#85-policy-to-rule-promotion).
 
 #### Adding rules from Telegram
 
@@ -182,7 +182,7 @@ Yes, allow it.
 - add rule: allow npm install commands
 ```
 
-This approves the current tool call, forwards your text to the session, and also creates a new entry in `config/rules.yaml` (picked up automatically via hot-reload).
+This approves the current tool call, forwards your text to the session, and also creates a new entry in `rules.yaml` (picked up automatically via hot-reload).
 
 ## Telegram commands
 
@@ -200,9 +200,9 @@ Once the bot is running, you can control sessions from your phone:
 
 ## Configuration
 
-### `config/orchestrator.yaml`
+### `~/.config/claude-cube/orchestrator.yaml`
 
-Controls the server port, escalation behavior, Telegram settings, and stop handler:
+Controls the server port, escalation behavior, Telegram settings, and stop handler. On first run, the template from `config/orchestrator.yaml` is copied here:
 
 ```yaml
 server:
@@ -263,8 +263,7 @@ src/
 hooks/
   claudecube-hook.sh        # Shell script called by Claude Code hooks
 config/
-  rules.yaml                # Safety rules (edit this)
-  policies.yaml             # Shared policies (committed)
-  policies.local.yaml       # Local policies from Telegram (gitignored)
-  orchestrator.yaml         # Server + escalation settings (edit this)
+  rules.yaml                # Template — copied to ~/.config/claude-cube/ on first run
+  policies.yaml             # Template — copied to ~/.config/claude-cube/ on first run
+  orchestrator.yaml         # Template — copied to ~/.config/claude-cube/ on first run
 ```

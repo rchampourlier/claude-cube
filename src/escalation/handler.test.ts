@@ -53,7 +53,7 @@ describe("EscalationHandler", () => {
 
       await handler.evaluate("Bash", { command: "ls" }, {
         agentId: sessionId,
-        cwd: "/Users/romain/dev/claude-cube",
+        cwd: "/Users/testuser/dev/claude-cube",
         paneId: "%42",
         label: sessionLabel,
         rulesContext: "No rule matched",

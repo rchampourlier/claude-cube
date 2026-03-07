@@ -16,7 +16,7 @@ describe("SessionTracker", () => {
 
     it("register uses cwd basename as label fallback, not truncated session ID", () => {
       const sessionId = "a04caae5-86f4-1e8c-9abc-def012345678";
-      const cwd = "/Users/romain/dev/claude-cube";
+      const cwd = "/Users/testuser/dev/claude-cube";
       tracker.register(sessionId, cwd);
 
       const label = tracker.getLabel(sessionId);
@@ -45,7 +45,7 @@ describe("SessionTracker", () => {
     beforeEach(() => {
       tracker = new SessionTracker({
         resolveLabel: (cwd: string) =>
-          cwd === "/Users/romain/dev/claude-cube" ? "main:claude-cube" : null,
+          cwd === "/Users/testuser/dev/claude-cube" ? "main:claude-cube" : null,
         findPaneForCwd: () => "%42",
         listClaudePanes: () => [],
       });
@@ -53,7 +53,7 @@ describe("SessionTracker", () => {
 
     it("register uses the tmux label", () => {
       const sessionId = "d37ffh18-9g5c-4b1f-2345-cdef01234567";
-      tracker.register(sessionId, "/Users/romain/dev/claude-cube");
+      tracker.register(sessionId, "/Users/testuser/dev/claude-cube");
 
       assert.equal(tracker.getLabel(sessionId), "main:claude-cube");
     });
@@ -77,7 +77,7 @@ describe("SessionTracker", () => {
 
   describe("multiple panes sharing the same cwd", () => {
     it("registerFromTmux registers all panes even with duplicate CWDs", () => {
-      const sharedCwd = "/Users/romain/dev/claude-cube";
+      const sharedCwd = "/Users/testuser/dev/claude-cube";
       tracker = new SessionTracker({
         resolveLabel: () => null,
         findPaneForCwd: () => null,
@@ -95,7 +95,7 @@ describe("SessionTracker", () => {
     });
 
     it("ensureRegistered merges the correct synthetic session by pane ID", () => {
-      const sharedCwd = "/Users/romain/dev/claude-cube";
+      const sharedCwd = "/Users/testuser/dev/claude-cube";
       tracker = new SessionTracker({
         resolveLabel: (_cwd, paneId) => paneId === "%20" ? "pentest" : paneId === "%10" ? "backups" : null,
         findPaneForCwd: (_cwd, paneId) => paneId ?? null,
@@ -130,7 +130,7 @@ describe("SessionTracker", () => {
 
     it("getLabel after ensureRegistered returns a human-readable name, not a session ID", () => {
       const sessionId = "e48ggi29-0h6d-5c2g-3456-def012345678";
-      const cwd = "/Users/romain/dev/awesome-project";
+      const cwd = "/Users/testuser/dev/awesome-project";
       tracker.ensureRegistered(sessionId, cwd, "/tmp/transcript.jsonl");
       tracker.updateToolUse(sessionId, "Bash");
 

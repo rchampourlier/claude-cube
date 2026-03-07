@@ -10,8 +10,8 @@ This skill analyzes policies in the claude-cube permission orchestrator and sugg
 
 ## Policy File Locations
 
-- **Shared policies**: `config/policies.yaml` — committed to git, shared across machines
-- **Local policies**: `config/policies.local.yaml` — gitignored, machine-specific, grows organically via Telegram approvals
+- **Shared policies**: `~/.config/claude-cube/policies.yaml` — user-editable, persisted across sessions
+- **Local policies**: `~/.config/claude-cube/policies.local.yaml` — machine-specific, grows organically via Telegram approvals
 
 ## Policy Format
 
@@ -38,7 +38,7 @@ Examples of well-written descriptions:
 git push to remote (no --force). Authorized repos: lca-rust, carbonfact
 read/write files in ~/.config and ~/.claude, including git operations
 use task-related tools (Task, TaskCreate, TaskUpdate, TaskOutput)
-explore files and directories in ~/dev and ~/dev+rc10r
+explore files and directories in ~/projects
 ```
 
 ## Consolidation Procedure
@@ -46,8 +46,8 @@ explore files and directories in ~/dev and ~/dev+rc10r
 ### Step 1 — Load policies
 
 Read both policy files:
-- `config/policies.yaml`
-- `config/policies.local.yaml`
+- `~/.config/claude-cube/policies.yaml`
+- `~/.config/claude-cube/policies.local.yaml`
 
 Present a numbered list of all current policies to the user, grouped by tool.
 
@@ -90,13 +90,13 @@ On approval:
 1. Apply the approved merges and style rewrites
 2. Re-number IDs sequentially (`pol_0`, `pol_1`, `pol_2`, ...)
 3. Rewrite `config/policies.local.yaml` using the Write tool
-4. Leave `config/policies.yaml` unchanged (shared policies are managed separately)
+4. Leave `~/.config/claude-cube/policies.yaml` unchanged (shared policies are managed separately)
 5. Show the final policy list for confirmation
 
 ### Important constraints
 
 - Never remove a policy without explicit user approval
-- Never modify `config/policies.yaml` — only touch `config/policies.local.yaml`
+- Never modify `~/.config/claude-cube/policies.yaml` — only touch `~/.config/claude-cube/policies.local.yaml`
 - When merging, the new description must be at least as broad as the union of the originals
 - Preserve the YAML structure: top-level `policies:` key containing a list
 - After rewriting, verify the file parses correctly by reading it back

@@ -5,6 +5,7 @@ import { watch } from "node:fs";
 import { parseArgs } from "node:util";
 import { setLogLevel, createLogger } from "./util/logger.js";
 import { loadOrchestratorConfig } from "./config/loader.js";
+import { ensureConfigDir, resolveConfigPath } from "./config/paths.js";
 import { loadRules } from "./rule-engine/index.js";
 import { RuleEngine } from "./rule-engine/engine.js";
 import { EscalationHandler } from "./escalation/handler.js";
@@ -41,8 +42,8 @@ Options:
   --uninstall        Remove hooks from ~/.claude/settings.json
   --status           Query GET /status and print active sessions
   --port             Custom server port (default: from config or 7080)
-  --config, -c       Path to orchestrator.yaml (default: config/orchestrator.yaml)
-  --rules, -r        Path to rules.yaml (default: config/rules.yaml)
+  --config, -c       Path to orchestrator.yaml (default: ~/.config/claude-cube/orchestrator.yaml)
+  --rules, -r        Path to rules.yaml (default: ~/.config/claude-cube/rules.yaml)
   --verbose, -v      Enable debug logging
   --help, -h         Show this help
 `);
@@ -82,8 +83,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  const configPath = resolve(values.config ?? "config/orchestrator.yaml");
-  const rulesPath = resolve(values.rules ?? "config/rules.yaml");
+  // Bootstrap: ensure ~/.config/claude-cube/ exists with template configs
+  ensureConfigDir();
+
+  const configPath = resolve(values.config ?? resolveConfigPath("orchestrator.yaml"));
+  const rulesPath = resolve(values.rules ?? resolveConfigPath("rules.yaml"));
 
   // --status queries the running server
   if (values.status) {
@@ -109,7 +113,7 @@ async function main(): Promise<void> {
   const auditDir = join(process.cwd(), ".claudecube", "audit");
   const auditLog = new AuditLog(auditDir);
   const costTracker = new CostTracker(auditDir);
-  const policyStore = new PolicyStore(resolve("config/policies.yaml"), resolve("config/policies.local.yaml"));
+  const policyStore = new PolicyStore(resolveConfigPath("policies.yaml"), resolveConfigPath("policies.local.yaml"));
   const sessionTracker = new SessionTracker();
   const modeManager = new ModeManager(config.mode.default);
 

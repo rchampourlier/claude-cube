@@ -20,7 +20,7 @@ Always run `npm run lint` after making changes. The project must compile with ze
 - **`@anthropic-ai/sdk`** — direct Anthropic API client, used by the LLM evaluator (`src/escalation/llm-evaluator.ts`) to call Haiku.
 - **Telegraf** — Telegram bot framework. Inline keyboards for approval flow.
 - **Zod** — runtime validation of YAML configs and rules.
-- **yaml** — YAML parsing for `config/rules.yaml` and `config/orchestrator.yaml`.
+- **yaml** — YAML parsing for config files (`rules.yaml`, `orchestrator.yaml`).
 - **micromatch** — glob pattern matching in the rule engine.
 
 ## Architecture
@@ -170,17 +170,17 @@ import { RuleEngine } from "./engine";           // wrong — will fail at runti
 
 ### Rule engine
 
-- Rules in `config/rules.yaml` are validated with Zod at load time, including regex compilation.
+- Rules in `~/.config/claude-cube/rules.yaml` are validated with Zod at load time, including regex compilation.
 - The `tool` field supports pipe-separated names: `"Write|Edit"`.
 - Match conditions are OR within a field (any pattern match = field matches), and the rule matches if the tool name matches AND any field's patterns match.
 - If a rule has no `match` block, it matches all uses of that tool.
 
 ### Policies (human feedback)
 
-Policies are free-text instructions created from Telegram text replies, fed to the LLM evaluator as context. They are distinct from **safety rules** (`config/rules.yaml`) which are deterministic regexp/glob/literal checks. See `src/policies/` and [08-policy-learning.md](specs/08-policy-learning.md).
+Policies are free-text instructions created from Telegram text replies, fed to the LLM evaluator as context. They are distinct from **safety rules** (`rules.yaml`) which are deterministic regexp/glob/literal checks. See `src/policies/` and [08-policy-learning.md](specs/08-policy-learning.md).
 
-- **Shared**: `config/policies.yaml` — committed to git, shared across machines
-- **Local**: `config/policies.local.yaml` — gitignored, machine-specific, grows via Telegram approvals
+- **Shared**: `~/.config/claude-cube/policies.yaml` — user-editable, persisted across sessions
+- **Local**: `~/.config/claude-cube/policies.local.yaml` — machine-specific, grows via Telegram approvals
 
 Both files are loaded by `PolicyStore` and merged at runtime. New policies from Telegram are always saved to the local file.
 
@@ -202,10 +202,12 @@ When adding a new Telegram bot command, add an entry to the `COMMANDS` constant 
 
 ## Config files
 
-- `config/rules.yaml` — safety rules. Schema: `src/rule-engine/types.ts` (`RulesConfigSchema`).
-- `config/policies.yaml` — shared policies (committed). Schema: `src/policies/types.ts`.
-- `config/policies.local.yaml` — local policies (gitignored). Same schema, grows via Telegram.
-- `config/orchestrator.yaml` — server port, escalation, Telegram, stop handler settings. Schema: `src/config/types.ts` (`OrchestratorConfigSchema`).
+Runtime config lives in `~/.config/claude-cube/` (bootstrapped from `config/` templates on first run):
+
+- `rules.yaml` — safety rules. Schema: `src/rule-engine/types.ts` (`RulesConfigSchema`).
+- `policies.yaml` — shared policies. Schema: `src/policies/types.ts`.
+- `policies.local.yaml` — local policies, grows via Telegram. Same schema.
+- `orchestrator.yaml` — server port, escalation, Telegram, stop handler settings. Schema: `src/config/types.ts` (`OrchestratorConfigSchema`).
 
 When adding new config fields, add them to the Zod schema first with a `.default()` value to keep backward compatibility.
 
