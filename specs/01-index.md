@@ -70,7 +70,7 @@ JSON response -> hook script -> Claude Code
 
 On startup:
   tmux scan -------> Pre-register existing Claude sessions
-  fs.watch --------> Watch config/rules.yaml for hot-reload
+  fs.watch --------> Watch ~/.config/claude-cube/rules.yaml for hot-reload
 ```
 
 ## Table of Contents

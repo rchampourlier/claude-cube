@@ -225,7 +225,7 @@ This would: approve the tool call and save "it's ok to push on the default repos
 
 ### Policy-to-Rule Promotion
 
-Policies are soft guidance for the LLM evaluator. Over time, stable policies can be promoted to hard rules in `config/rules.yaml` via a dedicated skill. See [Policy Learning](08-policy-learning.md) for details.
+Policies are soft guidance for the LLM evaluator. Over time, stable policies can be promoted to hard rules in `~/.config/claude-cube/rules.yaml` via a dedicated skill. See [Policy Learning](08-policy-learning.md) for details.
 
 ### Stop Decision Text Replies
 

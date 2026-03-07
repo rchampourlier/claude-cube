@@ -45,7 +45,7 @@ class PolicyStore {
 }
 ```
 
-**File location**: `config/policies.yaml` (relative to the process working directory).
+**File location**: `~/.config/claude-cube/policies.yaml`.
 
 **Persistence**: The file is written synchronously on every `add()` and `remove()` call using `yaml.stringify()`.
 
@@ -63,7 +63,7 @@ class PolicyStore {
    { approved: true, policyText: "Always allow npm install in this project" }
 4. EscalationHandler detects policyText and calls:
    policyStore.add("Always allow npm install in this project", "Bash")
-5. PolicyStore assigns ID "pol_0", saves to config/policies.yaml
+5. PolicyStore assigns ID "pol_0", saves to ~/.config/claude-cube/policies.yaml
 6. Tool call is approved
 ```
 
@@ -127,20 +127,20 @@ The feedback loop progressively reduces the number of decisions that need human 
 
 ## 8.5 Policy-to-Rule Promotion
 
-Policies are soft guidance for the LLM evaluator. Over time, stable policies should be promoted to hard rules in `config/rules.yaml` for faster evaluation (skips the LLM entirely) and deterministic behavior.
+Policies are soft guidance for the LLM evaluator. Over time, stable policies should be promoted to hard rules in `~/.config/claude-cube/rules.yaml` for faster evaluation (skips the LLM entirely) and deterministic behavior.
 
 ### Promotion Mechanism
 
 A Claude skill (or manual process) can promote policies to rules:
 
-1. Read `config/policies.yaml` and present the list of active policies.
+1. Read `~/.config/claude-cube/policies.yaml` and present the list of active policies.
 2. For each policy the user wants to promote, determine:
    - The appropriate rule `action` (`allow` or `deny`)
    - The tool name scope
    - Any match patterns to extract from the policy description
-3. Write the new rule entry to `config/rules.yaml`.
+3. Write the new rule entry to `~/.config/claude-cube/rules.yaml`.
 4. The [hot-reload mechanism](02-safety-rules.md#25-hot-reload-support) picks up the change automatically.
-5. Optionally, remove the promoted policy from `config/policies.yaml` to avoid redundancy.
+5. Optionally, remove the promoted policy from `~/.config/claude-cube/policies.yaml` to avoid redundancy.
 
 ### Example
 

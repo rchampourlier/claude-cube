@@ -4,7 +4,7 @@ The safety rule system is the first line of defense in ClaudeCube's permission d
 
 ## 2.1 Rule Definition Language
 
-Rules are defined in YAML (`config/rules.yaml`) and validated at load time using Zod schemas.
+Rules are defined in YAML (`~/.config/claude-cube/rules.yaml`) and validated at load time using Zod schemas.
 
 ### Rule Schema
 
@@ -90,7 +90,7 @@ const RulesConfigSchema = z.object({
 
 ## 2.2 Default Rules
 
-The shipped `config/rules.yaml` includes the following rules:
+The shipped `rules.yaml` template includes the following rules:
 
 ### Deny Rules (Checked First)
 
@@ -177,7 +177,7 @@ Note: Regex patterns are compiled fresh on each match check. There is no regex c
 
 ## 2.5 Hot-Reload Support
 
-The rule engine supports runtime reloading of `config/rules.yaml` when the file is modified. This enables humans to add or modify rules (e.g., via Telegram escalation feedback) without restarting ClaudeCube.
+The rule engine supports runtime reloading of `~/.config/claude-cube/rules.yaml` when the file is modified. This enables humans to add or modify rules (e.g., via Telegram escalation feedback) without restarting ClaudeCube.
 
 ### Mechanism
 
@@ -194,7 +194,7 @@ The rule engine supports runtime reloading of `config/rules.yaml` when the file 
 
 ### Integration with Telegram Feedback
 
-When a human replies to an escalation with a rule directive (e.g., `- add rule: allow npm install`), the system can write the new rule to `config/rules.yaml`. The file watcher picks up the change and reloads automatically. This closes the loop between human feedback and rule enforcement.
+When a human replies to an escalation with a rule directive (e.g., `- add rule: allow npm install`), the system can write the new rule to `~/.config/claude-cube/rules.yaml`. The file watcher picks up the change and reloads automatically. This closes the loop between human feedback and rule enforcement.
 
 ## Cross-References
 

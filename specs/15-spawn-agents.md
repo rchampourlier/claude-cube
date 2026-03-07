@@ -199,7 +199,7 @@ If `searchPaths` is empty, the `/new` command replies with "Spawn not configured
 | `src/telegram/bot.ts` | Add `/new` command handler + disambiguation callback |
 | `src/tmux.ts` | Add `createWindow(path, name)` function |
 | `src/config/types.ts` | Add `SpawnConfigSchema` to orchestrator config |
-| `config/orchestrator.yaml` | Add `spawn` section |
+| `~/.config/claude-cube/orchestrator.yaml` | Add `spawn` section |
 
 ### Not in scope (v1)
 

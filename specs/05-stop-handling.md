@@ -166,7 +166,7 @@ Claude Code sets `stop_hook_active: true` when a stop event is triggered by a pr
 
 ## Configuration
 
-Stop behavior is configured in `config/orchestrator.yaml`:
+Stop behavior is configured in `~/.config/claude-cube/orchestrator.yaml`:
 
 ```yaml
 stop:

@@ -156,9 +156,9 @@ This creates a **feedback loop**: human decisions are encoded as policies that i
 
 ### Policy-to-Rule Promotion
 
-Policies are "soft" guidance for the LLM evaluator. For frequently-used policies, they can be promoted to "hard" rules in `config/rules.yaml`. This can be done:
-- Via a Claude skill that reads `config/policies.yaml`, presents policies for review, and writes matching rule entries to `config/rules.yaml` (picked up by [hot-reload](02-safety-rules.md#25-hot-reload-support)).
-- Manually by the user editing `config/rules.yaml`.
+Policies are "soft" guidance for the LLM evaluator. For frequently-used policies, they can be promoted to "hard" rules in `~/.config/claude-cube/rules.yaml`. This can be done:
+- Via a Claude skill that reads `~/.config/claude-cube/policies.yaml`, presents policies for review, and writes matching rule entries to `~/.config/claude-cube/rules.yaml` (picked up by [hot-reload](02-safety-rules.md#25-hot-reload-support)).
+- Manually by the user editing `~/.config/claude-cube/rules.yaml`.
 
 See [Policy Learning](08-policy-learning.md#85-policy-to-rule-promotion) for details.
 
@@ -182,7 +182,7 @@ The system prompt instructs the LLM: "Human-defined policies take precedence ove
 
 ## 4.4 Configuration
 
-The escalation pipeline is configured via `config/orchestrator.yaml`:
+The escalation pipeline is configured via `~/.config/claude-cube/orchestrator.yaml`:
 
 ```yaml
 escalation:

@@ -68,13 +68,13 @@ Polls idle time via `ioreg -c IOHIDSystem` (reads `HIDIdleTime` in nanoseconds).
 - When idle exceeds `idleThresholdSeconds` → switch to remote.
 - When user returns (idle drops below threshold) → switch to local.
 
-Configurable via `mode.autoDetect`, `mode.idleThresholdSeconds`, and `mode.pollIntervalSeconds` in `config/orchestrator.yaml`.
+Configurable via `mode.autoDetect`, `mode.idleThresholdSeconds`, and `mode.pollIntervalSeconds` in `~/.config/claude-cube/orchestrator.yaml`.
 
 Degrades gracefully on non-macOS: if `ioreg` is unavailable, auto-detection silently disables itself and logs a warning.
 
 ## 13.5 Configuration
 
-New section in `config/orchestrator.yaml`:
+New section in `~/.config/claude-cube/orchestrator.yaml`:
 
 ```yaml
 mode:
