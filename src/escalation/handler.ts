@@ -70,10 +70,9 @@ export class EscalationHandler {
       log.info("LLM confident deny, escalating to Telegram anyway", { toolName, reason: llmResult.reason }, label);
     }
 
-    // Local mode: passthrough instead of Telegram
+    // Local mode: passthrough instead of Telegram (no notification — user is at terminal)
     if (this.modeManager?.isLocal()) {
       log.info("Local mode — passthrough to terminal", { toolName }, label);
-      alertUser({ title: "Permission needed in terminal", message: toolName, paneId: context.paneId });
       return {
         allowed: false,
         reason: `LLM uncertain: ${llmResult.reason} (local mode passthrough)`,
